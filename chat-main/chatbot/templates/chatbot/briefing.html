@@ -1,0 +1,265 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solicitação de Proposta Corporativa</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+  <div class="menu">
+    <div class="logo">
+      <img class="logo" src="{% static 'img/logo-transparent.png' %}" alt="" height="30px" />
+    </div>
+  </div>
+  <div class="container w-50 py-5">
+    <h1 class="my-4">Formulário para geração de Proposta</h1>
+    <form id="proposalForm" method="POST">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="">Nome</label>
+        <input required type="text" class="form-control" name="name" />
+      </div>
+      <div class="form-group">
+        <label for="">Telefone</label>
+        <input required type="text" class="form-control" name="phone" />
+      </div>
+      <div class="form-group">
+        <label for="">Email</label>
+        <input required type="text" class="form-control" name="email" />
+      </div>
+      <div class="form-group">
+        <label for="">Empresa</label>
+        <input required type="text" class="form-control" name="question_1" />
+      </div>
+      <div class="form-group">
+        <label for="">Ramo</label>
+        <select class="form-control" id="fork" name="fork">
+          <option value="">---</option>
+          <option value="1">Indústria</option>
+          <option value="2">Comércio</option>
+          <option value="3">Serviços e Turismo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="">Atividades</label>
+        <select class="form-control" name="question_2" id="activity" disabled>
+          <option value="" selected>---</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="">Principal negócio</label>
+        <input required type="text" class="form-control" name="question_3" />
+      </div>
+      <div class="form-group">
+        <label for="">Colaboradores</label>
+        <select class="form-control" id="employers" name="question_4">
+          <option value="Menos de 50">Menos de 50</option>
+          <option value="Entre 50 e 100">Entre 50 e 100</option>
+          <option value="Entre 100 e 500">Entre 100 e 500</option>
+          <option value="Entre 500 e 1000">Entre 500 e 1000</option>
+          <option value="Entre 1000 e 2000">Entre 1000 e 2000</option>
+          <option value="Mais de 2000">Mais de 2000</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="">Qual a missão, visão e valores da empresa?</label>
+        <input required type="text" class="form-control" name="question_5" />
+      </div>
+      <div class="form-group">
+        <label for="">Quais os diferenciais essenciais da empresa?</label>
+        <input required type="text" class="form-control" name="question_6" />
+      </div>
+      <div class="form-group">
+        <label for="">Quais suas principais necessidades? Como podemos ajudar?</label>
+        <input required type="text" class="form-control" name="question_7" />
+      </div>
+      <div class="form-group">
+        <label for="">Essas necessidades foram geradas em função de algum problema em especial? Como surgiu essa
+          demanda?</label>
+        <input required type="text" class="form-control" name="question_8" />
+      </div>
+      <div class="form-group">
+        <label for="">Além das necessidades relatadas, existe alguma outra que você gostaria de relatar?</label>
+        <input required type="text" class="form-control" name="question_9" />
+      </div>
+      <div class="form-group">
+        <label for="">Qual o objetivo principal da capacitação?</label>
+        <input required type="text" class="form-control" name="question_10" />
+      </div>
+      <div class="form-group">
+        <label for="">Quais os principais temas que você acredita que devem ser trabalhados nesta formação?</label>
+        <input required type="text" class="form-control" name="question_11" />
+      </div>
+      <div class="form-group">
+        <label for="">Quem deverá participar da capacitação? (público-alvo) Quantas pessoas aproximadamente?</label>
+        <input required type="text" class="form-control" name="question_12" />
+      </div>
+      <div class="form-group">
+        <label for="">Qual o nível médio de formação (escolaridade) do público-alvo?</label>
+        <input required type="text" class="form-control" name="question_13" />
+      </div>
+      <div class="form-group">
+        <label for="">A capacitação fará parte de um programa de treinamento?</label>
+        <input required type="text" class="form-control" name="question_14" />
+      </div>
+      <div class="form-group">
+        <label for="">Outras observações:</label>
+        <textarea required class="form-control" name="question_15"></textarea>
+      </div>
+      <button type="submit" class="btn btn-success mb-5">Enviar Solicitação de Proposta</button>
+    </form>
+  </div>
+
+
+  <!-- Ícone de Ajuda -->
+  <div class="help-icon-container" onclick="openModal()">
+    <img src="{% static 'img/GenIA-person.png' %}" alt="Ajuda" id="help-icon">
+    <div class="help-message">
+      Olá, eu sou a GenIA. Precisa de ajuda?<br> Clique e visite nossa área de Perguntas Frequentes.
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="myModal" class="modal">
+    <div class="modal-content-help">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h2>Perguntas Frequentes</h2>
+      <div class="faq-section">
+        <div class="faq-question" onclick="toggleAnswer(this)">Para que serve a Página: Solicitação de Propostas
+          Externas?</div>
+        <div class="faq-answer">A funcionalidade "Solicitação de Propostas Externas" foi desenvolvida para que clientes
+          externos possam submeter seus pedidos diretamente via um formulário simples. Ao clicar no
+          <a href="https://genia-7df1c8dbef04.herokuapp.com/briefing/" target="_blank">link</a>, o cliente será
+          redirecionado para um formulário onde responderá a algumas perguntas que nos ajudam a entender melhor suas
+          necessidades. Depois de enviar o formulário, as respostas aparecerão nesta página para que um especialista em propostas
+          corporativas do Senac possa analisá-las e completar com informações adicionais. Com esses dados em mãos, a
+          GenIA gera uma proposta corporativa personalizada, que poderá ser negociada com o cliente de forma
+          eficiente, atendendo às suas expectativas.
+        </div>
+
+
+
+
+      </div>
+    </div>
+
+    <script>
+      let activity = {
+        industria: ["Gráfica", "Calçado", "Vestuário", "Bebidas", "Mobiliário", "Couros", "Metalurgia", "Mecânica", "Outro"],
+        comercio: ["Veículos", "Tecidos", "Combustíveis", "Ferragens", "Roupas", "Acessórios"],
+        serviços_e_turismo: ["Alimentação", "Transporte", "Turismo", "Saúde", "Educação", "Lazer"]
+      };
+
+      let fork = document.getElementById("fork");
+      let options = document.getElementById("activity");
+      let form = document.getElementById("proposalForm");
+
+      fork.addEventListener("change", (e) => {
+        switch (e.target.value) {
+          case "1":
+            options.removeAttribute("disabled");
+            options.innerHTML = activity.industria.map(el => `<option value="${el}">${el}</option>`).join('');
+            break;
+          case "2":
+            options.removeAttribute("disabled");
+            options.innerHTML = activity.comercio.map(el => `<option value="${el}">${el}</option>`).join('');
+            break;
+          case "3":
+            options.removeAttribute("disabled");
+            options.innerHTML = activity.serviços_e_turismo.map(el => `<option value="${el}">${el}</option>`).join('');
+            break;
+          default:
+            options.setAttribute("disabled", "disabled");
+            options.innerHTML = "";
+            break;
+        }
+      });
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        let formData = new FormData(form);
+
+        fetch('{% url "generate_proposal" %}', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            Swal.fire({
+              title: 'Dados enviados com sucesso!',
+              text: "Nossa equipe especializada analisará e entrará em contato em breve.",
+              icon: 'success',
+              confirmButtonText: 'Nova Proposta',
+
+
+            }).then((result) => {
+              if (result.isDismissed || result.isConfirmed) {
+                location.reload()
+
+              }
+            });
+          })
+          .catch(error => {
+            Swal.fire({
+              title: 'Erro!',
+              text: 'Ocorreu um erro ao enviar os dados. Tente novamente',
+              icon: 'error'
+            });
+          });
+      });
+
+
+
+
+      // AJUDA
+
+      // Função para adicionar a classe de animação
+      function blinkIcon() {
+        const icon = document.getElementById('help-icon');
+        icon.classList.add('blink');
+
+        // Remove a animação após completá-la
+        setTimeout(() => {
+          icon.classList.remove('blink');
+        }, 3000); // 3000ms = 3s para 6 ciclos de 0.5s cada
+      }
+
+      // Chama a função a cada 5 minutos (300000ms)
+      setInterval(blinkIcon, 300000);
+
+      // Funções para abrir e fechar o modal
+      function openModal() {
+        document.getElementById("myModal").style.display = "flex";
+      }
+
+      function closeModal() {
+        document.getElementById("myModal").style.display = "none";
+      }
+
+      // Função para expandir/colapsar a resposta
+      function toggleAnswer(element) {
+        const answer = element.nextElementSibling;
+        if (answer.style.display === "block") {
+          answer.style.display = "none";
+        } else {
+          answer.style.display = "block";
+        }
+      }
+
+    </script>
+</body>
+
+</html>

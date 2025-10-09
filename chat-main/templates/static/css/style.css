@@ -1,0 +1,731 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+
+
+
+
+
+
+body {
+    height: 100vh !important;
+    background-color: #f9f9f9;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Menu Superior */
+.menu {
+    background-color: #ffffff; /* Fundo branco para o menu */
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0; /* Linha sutil para separar o menu */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Sombra leve para elevação */
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.menu a {
+    color: var(--color-primary); /* Azul primário */
+    text-decoration: none;
+    font-size: 16px;
+    margin: 0 15px;
+    transition: color 0.3s ease-in-out;
+}
+
+.menu a:hover {
+    color: #F47C20; /* Laranja no hover */
+}
+
+.menu .logout {
+    padding: 8px 16px;
+    border: 1px solid #F47C20;
+    border-radius: 4px;
+    transition: background-color 0.3s ease-in-out;
+}
+
+.menu .logout:hover {
+    background-color: #F47C20; /* Laranja no hover */
+    color: #ffffff; /* Texto branco no hover */
+}
+
+/* Container Principal */
+.container {
+    flex-grow: 1;
+    width: 100%;
+    max-width: 1000px;
+    margin: 40px auto;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    padding: 10px 30px !important;
+}
+
+.chat-box {
+    background-color: #f0f4f8; /* Fundo suave de chat */
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+
+
+
+.chat-box h3 {
+    margin: 0;
+    font-size: 22px;
+    color: var(--color-primary);
+    margin-bottom: 15px;
+}
+
+.chat-box p {
+    margin: 0;
+    font-size: 16px;
+    color: #606060;
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.chat-box button {
+    padding: 12px 24px;
+    background-color: var(--color-primary);
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease-in-out, transform 0.2s;
+}
+
+.chat-box button:hover {
+    background-color: #F47C20;
+    transform: translateY(-2px);
+}
+
+
+.btn-options:hover{
+    background-color: var(--color-primary-hover) !important;
+}
+
+.input-area {
+    display: flex;
+    align-items: center;
+    margin-top: 20px;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 20px;
+}
+
+.input-area input {
+    flex: 1;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    margin-right: 10px;
+    padding-left: 15px;
+    transition: box-shadow 0.3s ease-in-out;
+}
+
+.input-area input:focus {
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+    outline: none;
+}
+
+.input-area button {
+    padding: 12px 20px;
+    background-color: var(--color-primary);
+    color: #ffffff;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease-in-out, transform 0.2s;
+}
+
+.input-area button:hover {
+    background-color: #F47C20;
+    transform: translateY(-2px);
+}
+
+
+
+
+
+.logo{
+    width: 100px;
+    height: auto;
+}
+
+body {
+    background-color: #f8f9fa;
+    height: 100vh;
+}
+
+
+
+
+.option-card {
+    cursor: pointer;
+    margin-bottom: 10px;
+    border-radius: 10px;
+}
+
+.card-body{
+    padding: 0.8rem !important;
+    color: white;
+}
+
+.message-container {
+    margin-top: 10px;
+}
+
+.options {
+    margin-top: 10px;
+}
+
+
+.navbar {
+    background-color: #8f8585ad;
+}
+.navbar .nav-link {
+    color: white !important;
+}
+.aside-options {
+    /* position: fixed; */
+    width: 250px;
+    /* max-height: 95%; */
+    background-color: #e9ecef;
+    color: white;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+
+.aside-options > h5{
+    color: black;
+}
+
+.option-card{
+    background-color: var(--color-primary) !important;
+    margin:5px !important;
+}
+
+.btn-options{
+    margin:5px !important;
+}
+
+.card{
+    height: 110px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background-color: #e9ecef;
+    border: none;
+}
+
+.card  p{
+    color: black;
+    margin: 10px;
+    text-align: justify;
+}
+
+
+.chat-container {
+    width: 60%;
+    height: 83%;
+    max-width: 1000px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.205);
+    margin: 40px auto;
+}
+.chat-box {
+    height: 75vh;
+    overflow-y: scroll;
+    padding: 15px;
+    background-color: white;
+}
+.chat-message {
+    margin-bottom: 15px;
+}
+.chat-message.user {
+    text-align: right;
+}
+.chat-message.bot {
+    text-align: left;
+    display: flex;
+}
+
+
+
+
+.bot-img{
+    min-width: 40px;
+    background-image: url(../img/bot-img.jpg);
+    background-size: cover;
+    height: 40px;
+    margin-right: 10px;
+    border-radius: 50%;
+    border: solid rgba(0, 0, 0, 0.362) 1px;
+}
+.chat-message .message {
+    display: inline-block;
+    padding: 10px;
+    border-radius: 15px;
+}
+.chat-message.user .message {
+    background-color: var(--color-primary);
+    color: white;
+}
+.chat-message.bot .message {
+    background-color: #f0f4f8;
+    color: #606060;
+}
+
+
+.input-group{
+    padding: 0 20px;
+}
+
+.input-group-append .btn {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+
+.list-user-btn{
+    vertical-align: middle !important;
+}
+
+
+
+
+
+
+
+
+
+
+/* ################ LISTAR PROFESSORES ################ */
+
+.dt-paging{
+    color: white !important;
+}
+
+.competency-input-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    border: 1px solid #ced4da;
+    border-radius: .25rem;
+    padding: .375rem .75rem;
+}
+
+.competency-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    min-width: 120px;
+}
+
+.competency-badge {
+    margin: 2px 5px;
+    background-color: #ee730b;
+    color: #fff;
+    padding: .25em .5em;
+    border-radius: .25rem;
+}
+
+.competency-badge .close {
+    margin-left: .5em;
+    cursor: pointer;
+}
+
+
+
+/* #### */
+
+body {
+    background-color: #f9f9f9;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.menu {
+    background-color: #ffffff;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.menu a {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-size: 16px;
+    margin: 0 15px;
+    transition: color 0.3s ease-in-out;
+}
+
+.menu a:hover {
+    color: #F47C20;
+}
+
+.menu a.active {
+    font-weight: bold;
+    color: var(--color-primary-hover);
+    background-color: #f0f4f8;
+    border-radius: 4px;
+    padding: 5px 10px;
+}
+
+/* Links principais do menu forçados ao azul da marca */
+.menu-link-primary {
+    color: #0D47A1 !important;
+    font-weight: 500;
+    padding: 5px 4px;
+    position: relative;
+    text-decoration: none;
+    transition: color .25s ease;
+}
+.menu-link-primary:hover { color:#F47C20 !important; }
+.menu-link-primary:after {
+    content:"";
+    position:absolute; left:0; right:0; bottom:-9px; height:3px;
+    background:#0D47A1; opacity:0; transform:translateY(4px);
+    transition:opacity .25s ease, transform .25s ease;
+    border-radius:2px;
+}
+.menu-link-primary:hover:after, .menu-link-primary:focus:after { opacity:1; transform:translateY(0); }
+
+table.dataTable > tbody > tr > td{
+    padding: 16px 10px !important;
+}
+
+.menu .logout {
+    padding: 8px 16px;
+    border: 1px solid #F47C20;
+    border-radius: 4px;
+    transition: background-color 0.3s ease-in-out;
+}
+
+.menu .logout:hover {
+    background-color: #F47C20;
+    color: #ffffff;
+}
+
+.container {
+    flex-grow: 1;
+    width: 100%;
+    max-width: 1000px;
+    margin: 40px auto;
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+
+.user-btn{
+    position: absolute;
+    top: 5px;
+    z-index: 1;
+}
+
+.add-professor-btn {
+    padding: 10px 20px;
+    background-color: var(--color-primary);
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease-in-out, transform 0.2s;
+}
+
+.add-professor-btn:hover {
+    background-color: var(--color-primary-hover);
+    transform: translateY(-2px);
+}
+
+.dt-input {
+    padding: 12px;
+    height: 2.2rem;
+    font-size: 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    width: 250px;
+    transition: box-shadow 0.3s ease-in-out;
+}
+
+.dt-input:focus {
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+    border-color: var(--color-primary);
+    outline: none;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.div-button{
+    position: absolute;
+    top:35px;
+    z-index: 1;
+}
+
+
+.title-proposal{
+    position: absolute !important;
+    top: 45px;
+    z-index: 1;
+}
+
+
+.dt-paging-button{
+    background-color: rgba(var(--color-primary-rgb), .57) !important;
+    color: white !important;
+}
+
+.current{
+    background-color: var(--color-primary) !important;
+    color: white !important;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+table th,
+table td {
+    vertical-align: middle !important;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+table thead th {
+    background-color: var(--color-primary);
+    color: #ffffff;
+    font-weight: bold;
+}
+
+table tr:nth-child(odd) {
+    background-color: #f9f9f9;
+}
+
+table tr:nth-child(even) {
+    background-color: #ffffff;
+}
+
+table tr:hover {
+    background-color: #f1f1f1 !important;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 10px;
+    font-size: 14px;
+    color: #ffffff;
+    background-color: var(--color-primary); 
+    border-radius: 12px;
+}
+
+.badge.orange {
+    background-color: #F47C20; 
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 20px;
+        margin: 20px auto;
+    }
+
+    .menu a {
+        font-size: 14px;
+        margin: 0 10px;
+    }
+
+    .dt-input {
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .header-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .add-professor-btn {
+        width: 100%;
+        margin-top: 10px;
+    }
+}
+
+
+
+/* #######AJUDA######## */
+
+
+ .help-icon-container {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.help-icon-container img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid var(--color-primary);
+    object-fit: cover;
+    padding: 0;
+}
+
+
+@keyframes blink {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+.blink {
+    animation: blink 0.5s ease-in-out alternate 6;
+}
+
+.help-message {
+    margin-left: 10px;
+    background-color: #333;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+    position: absolute;
+    left: 70px;
+    bottom: 20px;
+    white-space: nowrap;
+}
+
+.help-icon-container:hover .help-message {
+    display: block;
+}
+
+.help-message::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -8px;
+    transform: translateY(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: transparent #333 transparent transparent;
+}
+
+
+#myModal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content-help {
+    background-color: #fefefe;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 600px;
+    max-height: 80vh;
+    border-radius: 10px;
+    overflow-y: auto;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.faq-section {
+    margin-top: 20px;
+}
+
+.faq-question {
+    cursor: pointer;
+    padding: 10px;
+    background-color: #f0f4f8;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    font-weight: bold;
+    transition: background-color 0.3s ease-in-out;
+}
+
+.faq-question:hover {
+    background-color: #e0e6ef;
+}
+
+.faq-answer {
+    display: none;
+    padding: 10px;
+    background-color: #ffffff;
+    border-left: 3px solid var(--color-primary);
+    margin-top: -10px;
+    margin-bottom: 10px;
+    border-radius: 0 0 5px 5px;
+} 

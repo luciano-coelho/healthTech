@@ -1,0 +1,317 @@
+{% extends 'base.html' %} {% block main %}
+{% load static %}
+
+<!-- LIST USER MODAL -->
+
+
+<!-- Modal -->
+<div class="modal fade" id="listModal" tabindex="-1" aria-labelledby="listModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content p-3">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="exampleModalLabel">Detalhes</h2>
+      </div>
+      <div class="modal-body">
+        <form id="listuserForm">
+          <div class="mb-2">
+            <label for="exampleInputEmail1" class="form-label">Usuário</label>
+            <input type="text" class="form-control" name="username" id="list-username" aria-describedby="emailHelp"
+              data-id="2" disabled />
+          </div>
+          <div class="mb-2">
+            <label for="exampleInputEmail1" class="form-label">Administrador</label>
+            <select class="form-control" name="admin" id="list-is-superuser" disabled>
+              <option value="0">Não</option>
+              <option value="1">Sim</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label for="exampleInputEmail1" class="form-label">Email</label>
+            <input type="email" class="form-control" name="email" id="list-email" aria-describedby="emailHelp"
+              disabled />
+          </div>
+          <div class="mb-3">
+            <label for="exampleInputEmail1" class="form-label">Permitir Acesso?</label>
+            <select class="form-control" name="active" id="list-is-superuser" disabled>
+              <option value="0">Não</option>
+              <option value="1">Sim</option>
+            </select>
+          </div>
+          <button type="reset" class="btn btn-secondary" data-bs-dismiss="modal">
+            Fechar
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ##################### -->
+<!-- EDIT USER MODAL -->
+
+
+<!-- Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content p-3">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="exampleModalLabel">Editar Usuário</h1>
+      </div>
+      <div class="modal-body">
+        <form id="edituserForm" method="POST" action="{% url 'edit-user' %}">
+          {% csrf_token %}
+          <input type="hidden" name="id-user" id="edit-id" readonly>
+          <div class="mb-2">
+            <label for="exampleInputEmail1" class="form-label">Usuário</label>
+            <input type="text" class="form-control" name="username" id="edit-username" aria-describedby="emailHelp"
+              data-id="2" required disabled />
+          </div>
+          <div class="mb-2">
+            <label for="exampleInputEmail1" class="form-label">Administrador</label>
+            <select class="form-control" name="admin" id="edit-is-superuser">
+              <option value="0">Não</option>
+              <option value="1">Sim</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label for="exampleInputEmail1" class="form-label">Email</label>
+            <input type="email" class="form-control" name="email" id="edit-email" aria-describedby="emailHelp"
+              required />
+          </div>
+          <div class="mb-3">
+            <label for="exampleInputEmail1" class="form-label">Permitir Acesso?</label>
+            <select class="form-control" name="active" id="edit-is-active">
+              <option value="0">Não</option>
+              <option value="1">Sim</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-success">Atualizar</button>
+          <button type="reset" class="btn btn-danger" data-bs-dismiss="modal">
+            Cancelar
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ##################### -->
+
+<div class="container my-5" style="padding: 30px !important; max-width: 1200px !important">
+  <div class="align-items-center d-flex justify-content-between position-relative">
+    <!-- Button trigger modal -->
+    <button type="button" class="add-professor-btn user-btn" data-bs-toggle="modal"
+      data-bs-target="#exampleModal">
+      + Adicionar Usuário
+    </button>
+
+    <!-- Modal -->
+    <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content p-3">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="exampleModalLabel">
+              Novo usuário
+            </h1>
+          </div>
+          <div class="modal-body">
+            <form method="POST" action="{% url 'create-user' %}">
+              {% csrf_token %}
+              <div class="mb-2">
+                <label for="exampleInputEmail1" class="form-label">Usuário</label>
+                <input type="text" class="form-control" name="username" id="exampleInputEmail1"
+                  aria-describedby="emailHelp" required />
+              </div>
+              <div class="mb-2">
+                <label for="exampleInputEmail1" class="form-label">Administrador</label>
+                <select class="form-control" name="admin" id="">
+                  <option value="0">Não</option>
+                  <option value="1">Sim</option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label for="exampleInputEmail1" class="form-label">Email</label>
+                <input type="email" class="form-control" name="email" id="exampleInputEmail1"
+                  aria-describedby="emailHelp" required />
+              </div>
+              <div class="mb-5">
+                <label for="exampleInputPassword1" class="form-label">Senha</label>
+                <input type="password" class="form-control" name="password" id="exampleInputPassword1" required />
+              </div>
+              <button type="submit" class="btn btn-success">Adicionar</button>
+              <button type="reset" class="btn btn-danger" data-bs-dismiss="modal">
+                Cancelar
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <table class="table" id="userTable">
+    <thead class="table-dark">
+      <tr>
+        <th scope="col">Id</th>
+        <th scope="col">Nome</th>
+        <th scope="col">Email</th>
+        <th scope="col">Administrador</th>
+        <th scope="col">Status</th>
+        <th style="width: 50px;"></th>
+        <th style="width: 50px;"></th>
+      </tr>
+    </thead>
+    <tbody id="myTable">
+      {% for user in users %}
+      <tr>
+        <th scope="row">{{user.id}}</th>
+        <td>
+          <a type="button" class="list-user-btn" data-bs-toggle="modal" data-bs-target="#listModal"
+            data-list-id="{{user.id}}" , data-list-username="{{ user.username }}" data-list-email="{{ user.email }}"
+            data-list-is-superuser="{% if user.is_superuser %}Sim{% else %}Não{% endif %}"
+            data-list-is-active="{% if user.is_active %}Habilitado{% else %}Desabilitado{% endif %}">{{user.username}}
+          </a>
+        </td>
+        <td>{{user.email}}</td>
+        <td>{% if user.is_superuser %} Sim {% else %} Não {% endif %}</td>
+        <td>
+          {% if user.is_active %}
+          <div class="badge badge-pill badge-success p-2">Habilitado</div>
+          {% else %}
+          <div class="badge badge-pill badge-danger bg-secondary p-2">Desabilitado</div>
+          {% endif %}
+        </td>
+        <td>
+          <i type="button" data-bs-toggle="modal" data-bs-target="#editModal" data-id="{{user.id}}"
+            data-username="{{ user.username }}" data-email="{{ user.email }}"
+            data-is-superuser="{% if user.is_superuser %}Sim{% else %}Não{% endif %}"
+            data-is-active="{% if user.is_active %}Habilitado{% else %}Desabilitado{% endif %}" title="Editar Usuário"
+            class="fa-regular fa-pen-to-square text-success edit-user-btn" style="cursor: pointer;"></i>
+        </td>
+        <td>
+          <i data-id="{{user.id}}" title="Deletar Usuário" class="fa-solid fa-trash-can text-danger deleteUser"
+            style="cursor: pointer;"></i>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+
+
+new DataTable('#userTable', {
+    "language": {
+      "url": `{% static 'Portuguese-Brasil.json' %}`,
+      "search": "",
+      "searchPlaceholder": "Buscar Usuário" //
+    },
+    "pageLength": 9,
+    "pagingType": "numbers",
+    "lengthChange": false,
+    "info": false,
+    "columnDefs": [
+      { "orderable": false, "targets": [-1, -2] }  // Desativa ordenação para as duas últimas colunas
+    ]
+  });
+
+  $(document).ready(function () {
+
+
+
+
+
+    $('.deleteUser').on('click', function () {
+      var userId = $(this).data('id');
+
+
+      Swal.fire({
+        title: 'Tem certeza?',
+        text: "Você quer mesmo excluir este usuário?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sim',
+        cancelButtonText: 'Não'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.location.href = `/delete-user/${userId}`;
+        }
+      });
+
+
+    });
+
+
+  });
+
+
+
+
+
+
+
+
+
+
+
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var editModal = document.getElementById('editModal');
+    editModal.addEventListener('show.bs.modal', function (event) {
+      var button = event.relatedTarget; // Botão que acionou o modal
+
+      // Extrair informações dos atributos data-*
+      var userId = button.getAttribute('data-id');
+      var userName = button.getAttribute('data-username');
+      var userEmail = button.getAttribute('data-email');
+      var isSuperuser = button.getAttribute('data-is-superuser') === 'Sim' ? '1' : '0';
+      var isActive = button.getAttribute('data-is-active') === 'Habilitado' ? '1' : '0';
+
+      // Preencher os campos do modal com as informações do usuário
+      document.getElementById('edit-id').value = userId;
+      document.getElementById('edit-username').value = userName;
+      document.getElementById('edit-email').value = userEmail;
+      document.getElementById('edit-is-superuser').value = isSuperuser;
+      console.log(document.getElementById('edit-is-active').value = isActive);
+      document.getElementById('edit-is-active').value = isActive;
+      console.log(document.getElementById('edit-is-active').value = isActive);
+
+    });
+  });
+
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var listModal = document.getElementById('listModal');
+    listModal.addEventListener('show.bs.modal', function (event) {
+      var button = event.relatedTarget; // Botão que acionou o modal
+
+
+      var userName = button.getAttribute('data-list-username');
+      console.log(userName);
+      
+      var userEmail = button.getAttribute('data-list-email');
+      var isSuperuser = button.getAttribute('data-list-is-superuser') === 'Sim' ? '1' : '0';
+      var isActive = button.getAttribute('data-list-is-active') === 'Habilitado';
+
+      // Preencher os campos do modal com as informações do usuário
+      document.getElementById('list-username').value = userName;
+      document.getElementById('list-email').value = userEmail;
+      document.getElementById('list-is-superuser').value = isSuperuser;
+    });
+  });
+
+
+  document.getElementById('edituserForm').x
+  document.getElementById('listuserForm').x
+
+
+
+
+
+</script>
+
+{% endblock %}

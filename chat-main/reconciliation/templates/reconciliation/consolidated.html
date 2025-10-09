@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% load reconciliation_extras %}
+
+{% block main %}
+<div class="container recon-container mt-4">
+  <div class="d-flex align-items-center justify-content-between mb-1">
+    <h4 class="mb-0">Demonstrativo: {{ repasse_numero }} - {{ competencia }}</h4>
+    <a href="{% url 'upload_remittance' %}" class="btn btn-outline-secondary btn-sm">Voltar ao upload</a>
+  </div>
+  <p class="text-muted mb-3"><strong>Terceiro:</strong> {{ terceiro_nome }} | <strong>CNPJ:</strong> {{ cnpj }} | <strong>Previsão:</strong> {{ previsao_pagamento }}</p>
+
+  {% if summary_all %}
+  <h5 class="mt-2 mb-2">Consolidado geral</h5>
+  <div class="mb-4">
+    <div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;">
+      <div class="d-flex justify-content-between flex-wrap" style="gap:24px">
+        <div>
+          <div class="text-muted">Itens (consolidado)</div>
+          <div class="h5 mb-0 text-dark font-weight-bold">{{ summary_all.count }}</div>
+        </div>
+        <div>
+          <div class="text-muted">Qtd total</div>
+          <div class="h5 mb-0 text-dark font-weight-bold">{{ summary_all.total_qtd|default:'0' }}</div>
+        </div>
+        <div>
+          <div class="text-muted">Bruto</div>
+          <div class="h5 mb-0 text-dark font-weight-bold">{{ summary_all.bruto|brl }}</div>
+        </div>
+        <div>
+          <div class="text-muted">Impostos</div>
+          <div class="h5 mb-0 text-dark font-weight-bold">{{ summary_all.impostos|brl }}</div>
+        </div>
+        <div>
+          <div class="text-muted">Líquido (calculado)</div>
+          <div class="h5 mb-0 text-dark font-weight-bold">{{ summary_all.liquido_calculado|brl }}</div>
+        </div>
+        <div>
+          <div class="text-muted">Líquido (informado)</div>
+          <div class="h5 mb-0 text-dark font-weight-bold">{{ summary_all.liquido_informado|brl }}</div>
+        </div>
+        <div>
+          <div class="text-muted">Diferença</div>
+          <div class="h5 mb-0 font-weight-bold {% if summary_all.diferenca and summary_all.diferenca != 0 %}diff-highlight{% else %}text-dark{% endif %}">
+            {{ summary_all.diferenca|brl }}
+            {% if summary_all.diferenca and summary_all.diferenca != 0 and summary_all.percent_diferenca %}
+              <small class="ml-1" style="font-weight:600;">({{ summary_all.percent_diferenca|pct }})</small>
+            {% endif %}
+          </div>
+        </div>
+        <div class="flex-break"></div>
+        <div>
+          <div class="text-muted">Taxa média de impostos</div>
+          <div class="h5 mb-0 text-dark font-weight-bold">{% if summary_all.taxa_media_impostos %}{{ summary_all.taxa_media_impostos|pct }}{% else %}-{% endif %}</div>
+        </div>
+        <div>
+          <div class="text-muted">Procedimento mais rentável</div>
+          <div class="h6 mb-0 text-dark font-weight-bold">
+            {% if summary_all.top_procedimento_nome %}
+              {{ summary_all.top_procedimento_valor|brl }}
+              <small class="text-muted d-block" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ summary_all.top_procedimento_nome }}">{{ summary_all.top_procedimento_nome }}</small>
+            {% else %}-{% endif %}
+          </div>
+        </div>
+        <div>
+          <div class="text-muted">Convênio mais rentável</div>
+          <div class="h6 mb-0 text-dark font-weight-bold">
+            {% if summary_all.top_convenio_nome %}
+              {{ summary_all.top_convenio_valor|brl }}
+              <small class="text-muted d-block">{{ summary_all.top_convenio_nome }}</small>
+            {% else %}-{% endif %}
+          </div>
+        </div>
+        <div>
+          <div class="text-muted">Pior convênio (imposto sobre lucro)</div>
+          <div class="h6 mb-0 text-dark font-weight-bold">
+            {% if summary_all.worst_convenio_nome %}
+              <span title="Lucro: {{ summary_all.worst_convenio_lucro|brl }} | Imposto: {{ summary_all.worst_convenio_imposto|brl }}">
+                {{ summary_all.worst_convenio_nome }} —
+                {% if summary_all.worst_convenio_percent %}
+                  {{ summary_all.worst_convenio_percent|pct }}
+                {% else %}-{% endif %}
+              </span>
+            {% else %}-{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <hr class="section-divider"/>
+  <h5 class="mt-2">Por profissional</h5>
+
+  <!-- Sumário com links para cada profissional + ações globais -->
+  <div class="mb-3">
+    <div class="small text-muted mb-2">Ir para:</div>
+    <div>
+      {% for entry in entries %}
+        <a class="btn btn-sm btn-outline-primary mr-1 mb-1" href="#prof-{{ entry.header.id }}">{{ entry.header.profissional_nome }}</a>
+      {% endfor %}
+    </div>
+    <div class="mt-2">
+      <button type="button" id="expand-all" class="btn btn-sm btn-outline-secondary mr-1">Expandir tudo</button>
+      <button type="button" id="collapse-all" class="btn btn-sm btn-outline-secondary">Recolher tudo</button>
+    </div>
+  </div>
+
+  {% for entry in entries %}
+    {% with header=entry.header summary=entry.summary items=entry.items %}
+    <div id="prof-{{ header.id }}" class="mb-4 p-3 border rounded" style="background:#fff; border-color:#e0e0e0;">
+      <h5 class="d-flex align-items-center mb-2" style="gap:8px;">
+        <span>{{ header.profissional_nome }}{% if header.especialidade %} — {{ header.especialidade }}{% endif %}</span>
+        <button type="button" class="btn btn-sm btn-link ml-auto p-0" data-action="toggle-block" data-target="prof-body-{{ header.id }}" aria-expanded="true">Recolher</button>
+      </h5>
+
+      <div id="prof-body-{{ header.id }}">
+      {% if summary %}
+      <div class="row mb-3">
+        <div class="col-12">
+          <div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;">
+            <div class="d-flex justify-content-between flex-wrap" style="gap:24px">
+              <div>
+                <div class="text-muted">Itens</div>
+                <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.count }}</div>
+              </div>
+              <div>
+                <div class="text-muted">Qtd total</div>
+                <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.total_qtd|default:'0' }}</div>
+              </div>
+              <div>
+                <div class="text-muted">Bruto</div>
+                <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.bruto|brl }}</div>
+              </div>
+              <div>
+                <div class="text-muted">Impostos</div>
+                <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.impostos|brl }}</div>
+              </div>
+              <div>
+                <div class="text-muted">Líquido (calculado)</div>
+                <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.liquido_calculado|brl }}</div>
+              </div>
+              <div>
+                <div class="text-muted">Líquido (informado)</div>
+                <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.liquido_informado|brl }}</div>
+              </div>
+              <div>
+                <div class="text-muted">Diferença</div>
+                <div class="h5 mb-0 font-weight-bold {% if summary.diferenca and summary.diferenca != 0 %}diff-highlight{% else %}text-dark{% endif %}">
+                  {{ summary.diferenca|brl }}
+                  {% if summary.diferenca and summary.diferenca != 0 and summary.percent_diferenca %}
+                    <small class="ml-1" style="font-weight:600;">({{ summary.percent_diferenca|pct }})</small>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="flex-break"></div>
+              <div>
+                <div class="text-muted">Taxa média de impostos</div>
+                <div class="h5 mb-0 text-dark font-weight-bold">{% if summary.taxa_media_impostos %}{{ summary.taxa_media_impostos|pct }}{% else %}-{% endif %}</div>
+              </div>
+              <div>
+                <div class="text-muted">Procedimento mais rentável</div>
+                <div class="h6 mb-0 text-dark font-weight-bold">
+                  {% if summary.top_procedimento_nome %}
+                    {{ summary.top_procedimento_valor|brl }}
+                    <small class="text-muted d-block" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ summary.top_procedimento_nome }}">{{ summary.top_procedimento_nome }}</small>
+                  {% else %}-{% endif %}
+                </div>
+              </div>
+              <div>
+                <div class="text-muted">Convênio mais rentável</div>
+                <div class="h6 mb-0 text-dark font-weight-bold">
+                  {% if summary.top_convenio_nome %}
+                    {{ summary.top_convenio_valor|brl }}
+                    <small class="text-muted d-block">{{ summary.top_convenio_nome }}</small>
+                  {% else %}-{% endif %}
+                </div>
+              </div>
+              <div>
+                <div class="text-muted">Pior convênio (imposto sobre lucro)</div>
+                <div class="h6 mb-0 text-dark font-weight-bold">
+                  {% if summary.worst_convenio_nome %}
+                    <span title="Lucro: {{ summary.worst_convenio_lucro|brl }} | Imposto: {{ summary.worst_convenio_imposto|brl }}">
+                      {{ summary.worst_convenio_nome }} —
+                      {% if summary.worst_convenio_percent %}
+                        {{ summary.worst_convenio_percent|pct }}
+                      {% else %}-{% endif %}
+                    </span>
+                  {% else %}-{% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if summary.alerts and summary.alerts|length %}
+      <div class="row mb-3">
+        <div class="col-12">
+          <div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;">
+            <div class="h6 mb-2">Insights</div>
+            <ul class="mb-0">
+              {% for a in summary.alerts %}
+                <li class="mb-1">
+                  {% if a.tipo == 'lucro_menor_que_imposto' %}
+                    Convênio <strong>{{ a.convenio }}</strong>: lucro {{ a.lucro|brl }} menor que imposto {{ a.imposto|brl }} (dif {{ a.diferenca|brl }} {% if a.percent %} / {{ a.percent|pct }}{% endif %}).
+                  {% elif a.tipo == 'lucro_quase_igual_imposto' %}
+                    Convênio <strong>{{ a.convenio }}</strong>: lucro {{ a.lucro|brl }} quase igual ao imposto {{ a.imposto|brl }} (dif {{ a.diferenca|brl }} {% if a.percent %} / {{ a.percent|pct }}{% endif %}).
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <h5>Itens</h5>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Paciente</th>
+              <th>Convênio</th>
+              <th>Categoria</th>
+              <th>Código</th>
+              <th>Procedimento</th>
+              <th style="text-align:right;">Qtd</th>
+              <th style="text-align:right;">Produzido</th>
+              <th style="text-align:right;">Imposto</th>
+              <th style="text-align:right;">Líquido</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr>
+              <td>{{ it.data }}</td>
+              <td>{{ it.paciente }}</td>
+              <td>{{ it.convenio }}</td>
+              <td>{{ it.categoria }}</td>
+              <td>{{ it.codigo }}</td>
+              <td>{{ it.procedimento }}</td>
+              <td style="text-align:right;">{% if it.quantidade %}{{ it.quantidade|floatformat:2 }}{% endif %}</td>
+              <td style="text-align:right;">{% if it.valor_produzido %}{{ it.valor_produzido|brl }}{% endif %}</td>
+              <td style="text-align:right;">{% if it.imposto %}{{ it.imposto|brl }}{% endif %}</td>
+              <td style="text-align:right;">{% if it.valor_liquido is not None %}{{ it.valor_liquido|brl }}{% else %}{{ it.valor_produzido|sub:it.imposto|brl }}{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="10">Nenhum item importado.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          {% if summary.count %}
+          <tfoot>
+            <tr class="totals-row">
+              <th colspan="6" class="totals-label-master">Totais:</th>
+              <th class="tfoot-cell text-right">
+                <span class="tfoot-label">Qtd</span>
+                <span class="tfoot-value">{{ summary.total_qtd|floatformat:0 }}</span>
+              </th>
+              <th class="tfoot-cell text-right">
+                <span class="tfoot-label">Bruto</span>
+                <span class="tfoot-value">{{ summary.bruto|brl }}</span>
+              </th>
+              <th class="tfoot-cell text-right">
+                <span class="tfoot-label">Impostos</span>
+                <span class="tfoot-value">{{ summary.impostos|brl }}</span>
+              </th>
+              <th class="tfoot-cell text-right">
+                <span class="tfoot-label">Líquido</span>
+                <span class="tfoot-value">{{ summary.liquido_informado|brl }}</span>
+              </th>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+      </div> <!-- /prof-body -->
+    </div>
+    {% endwith %}
+  {% endfor %}
+
+</div>
+
+<style>
+  /* Azul do cabeçalho da tabela e footer como no detalhe */
+  .table thead th { background:#0D47A1 !important; color:#fff !important; border-bottom:3px solid #0B3C85 !important; font-weight:600; }
+  .table thead th:first-child { border-top-left-radius:4px; }
+  .table thead th:last-child { border-top-right-radius:4px; }
+  tfoot .totals-row th { background:#fafafa; border-top:2px solid #0D47A1; vertical-align:top; }
+  .totals-label-master { text-align:right; font-weight:600; padding-right:12px; }
+  .tfoot-cell { min-width:120px; }
+  .tfoot-label { display:block; font-size:11px; font-weight:500; color:#4b5563; text-transform:uppercase; letter-spacing:.5px; line-height:1.1; margin-bottom:2px; }
+  .tfoot-value { display:block; font-weight:600; font-variant-numeric:tabular-nums; }
+  .tfoot-cell .tfoot-value { white-space:nowrap; }
+  table.table tfoot th, table.table tfoot td { padding-top:6px; padding-bottom:6px; }
+  tfoot .totals-row th { line-height:1.1; }
+  /* Refine per-column widths in footer: child(2)=Qtd, (3)=Bruto, (4)=Impostos, (5)=Líquido */
+  tfoot .totals-row th:nth-child(2) { min-width: 90px; }
+  tfoot .totals-row th:nth-child(3),
+  tfoot .totals-row th:nth-child(4),
+  tfoot .totals-row th:nth-child(5) { min-width: 140px; }
+  .flex-break { flex-basis:100%; width:100%; height:0; }
+  .diff-highlight { color:#F47C20 !important; }
+  .recon-container { max-width: 1155px !important; }
+  .section-divider { border-top:2px solid #e5e7eb; margin: 10px 0 16px; }
+</style>
+
+<script>
+  (function(){
+    function setBlockVisible(id, visible){
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.style.display = visible ? '' : 'none';
+      // update button label
+      var btn = document.querySelector('[data-action="toggle-block"][data-target="'+id+'"]');
+      if(btn){ btn.textContent = visible ? 'Recolher' : 'Expandir'; btn.setAttribute('aria-expanded', String(visible)); }
+    }
+    // individual toggle
+    document.addEventListener('click', function(e){
+      var t = e.target;
+      if(t && t.matches('[data-action="toggle-block"]')){
+        var id = t.getAttribute('data-target');
+        var el = document.getElementById(id);
+        if(!el) return;
+        var visible = el.style.display === 'none' ? false : true;
+        setBlockVisible(id, !visible);
+      }
+    });
+    // global controls
+    var expandAll = document.getElementById('expand-all');
+    var collapseAll = document.getElementById('collapse-all');
+    if(expandAll){
+      expandAll.addEventListener('click', function(){
+        document.querySelectorAll('[id^="prof-body-"]').forEach(function(el){ setBlockVisible(el.id, true); });
+      });
+    }
+    if(collapseAll){
+      collapseAll.addEventListener('click', function(){
+        document.querySelectorAll('[id^="prof-body-"]').forEach(function(el){ setBlockVisible(el.id, false); });
+      });
+    }
+  })();
+</script>
+
+{% endblock %}

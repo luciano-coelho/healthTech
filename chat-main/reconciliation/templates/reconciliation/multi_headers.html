@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="container mt-4">
+  <div class="alert alert-success">
+    Foram detectados múltiplos profissionais neste PDF. Escolha um extrato:
+  </div>
+  <ul class="list-group">
+    {% for h in headers %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span>
+          <strong>{{ h.profissional_nome }}</strong>
+          <small class="text-muted"> — {{ h.especialidade }}</small>
+        </span>
+        <a class="btn btn-sm btn-primary" href="{% url 'remittance_detail' h.id %}">Abrir</a>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+PROMPT V1
+
+`
+                Crie uma proposta de treinamento profissional e abrangente para a prestação de serviços ou produtos a um cliente com o nome ${response[1]}.
+                A proposta deve se basear nos seguintes parametros (IMPORTANTE: Nenhum parametro pode ser retornado vazio):
+                data:{}
+                destinatário:${response[0]}
+                titulo: ${response[5]}(Não utilizar os termos a seguir no titulo "Qualificação Profissional, Técnico, Graduação ou Pós-Graduação")
+                Objetivo:${response[6]}(essa etapa precisa ser detalhada em um parágrafo, utilizando o resumo informado. Importante utilizar um ou mais verbos a seguir para dar enfase no objetivo: difundir, divulgar, propagar, repassar, orientar, apresentar,aprimorar, melhorar, otimizar, complementar,
+                ampliar, potencializar, acrescentar, amplificar, aumentar, incrementar, práticar ,levantar, mapear, atuar, realizar)
+                Periodo de realização:{}(gerar com base na proposta)
+                Detalhamento da proposta: Essa etapa precisa ser detalhada levando em consideração o titulo e objetivo.
+                Importante!!! - O detalhamento da proposta deve ser dividido em etapas de dependendo da carga horaria e também utilizar a seguinte estrura: Titulo da etapa, carga horaria necessária, público alvo, objetivo da etapa, conteudo programatico(em lista)
+                Carga horária total: {}
+                Valor do investimento: {}
+                Importante que a resposta seja um objeto json sem as ""json"". O json deve sempre conter as seguinte estrurtura de  chaves: 
+                "data": "",
+                "cliente": "",
+                "destinatario": "",
+                "titulo": "",
+                "objetivo": "",
+                "periodo": "",
+                "detalhamento_proposta": [
+                    {
+                        "titulo_etapa": "",
+                        "carga_horaria_necessaria": "",
+                        "publico_alvo": "",
+                        "objetivo_da_etapa": "",
+                        "conteudo_programatico": [
+                        ],
+                    },
+                ],
+                "carga_horaria_total": "",
+                "valor_investimento": "",
+                `;
+
+
+
+PROMPT BREFING
+
+
+`
+Você é um sistema de geração de propostas corporativas. Com base nas informações do usuário abaixo você deve gerar uma proposta:
+informações_fornecidas_pelo_cliente:{
+    "Empresa": "",
+    "Ramo": "",
+    "Principal negócio": "",
+    "Colaboradores": "",
+    "Qual a missão, visão e valores da empresa?": "",
+    "Quais os diferenciais essenciais da empresa?": "",
+    "Quais suas principais necessidades? Como podemos ajuda-los?": "",
+    "Essas necessidades foram geradas em função de algum problema em especial? Como surgiu essa demanda?": "",
+    "Além das necessidades relatadas, existe alguma outra que você gostaria de relatar?": "",
+    "Qual o objetivo principal da capacitação?": "",
+    "Quais os principais temas que você acredita que devem ser trabalhados nesta formação?": "",
+    "Quem deverá participar da capacitação? (público-alvo) Quantas pessoas aproximadamente?": "",
+    "Qual o nível médio de formação(escolaridade) do público-alvo?": "",
+    "A capacitação fará parte de um programa de treinamento?": "",
+    "Outras observações": "",
+    "Sugestão de Título do curso": "",
+    "Tipo de curso": "",
+    "Eixo": "",
+    "Segmento": "",
+    "Carga Horária Sugerida": "",
+    "Escolaridade mínima necessária": "",
+    "Idade mínima necessária": "",
+    "Objetivo do Curso": "",
+    "Elementos": ""
+}
+A sua resposta sempre será um JSON utilizando SEMPRE a estrutura abaixo e SEMPRE preenchendo todos os valores:
+{
+    "data": "",
+                "cliente": "",
+                "destinatario": "",
+                "titulo": "",
+                "objetivo": "",
+                "periodo": "",
+                "detalhamento_proposta": [
+                    {
+                        "titulo_etapa": "",
+                        "carga_horaria_necessaria": "",
+                        "publico_alvo": "",
+                        "objetivo_da_etapa": "",
+                        "conteudo_programatico": [
+                        ],
+                    },
+                ],
+                "carga_horaria_total": "",
+                "valor_investimento": "",
+} 
+`

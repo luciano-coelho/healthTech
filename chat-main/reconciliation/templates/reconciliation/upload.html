@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block main %}
+
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
+
+<div class="container">
+  <div class="chat-box" id="chatbox">
+    <div class="chat-message bot">
+      <div class="bot-img"></div>
+      <div class="message">
+        <h3>Bem-vindo à Conciliação Financeira</h3>
+        <p>Envie o demonstrativo do hospital/plano em PDF para iniciarmos a conciliação.</p>
+        <div class="d-flex align-items-center">
+          <label for="id_pdf" class="btn btn-primary mr-2 mb-0">
+            <i class="fa fa-file-pdf mr-1"></i> Selecionar PDF
+          </label>
+          <span id="fileName" class="text-muted">Nenhum arquivo selecionado</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-message bot d-none" id="statusRow">
+      <div class="bot-img"></div>
+      <div class="message" id="statusMessage">
+        Preparando importação...
+        <div class="progress mt-2" style="height: 6px;">
+          <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form id="uploadForm" method="post" enctype="multipart/form-data" style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;">
+    {% csrf_token %}
+    {{ form.pdf }}
+  </form>
+
+  <div class="input-group my-2 p-2">
+    <input type="text" class="form-control" value="Envie um PDF do hospital/plano para começar" disabled />
+    <div class="input-group-append">
+      <button class="btn btn-primary" type="button" id="sendBtn" disabled>Enviar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Elementos
+  const pdfInput = document.getElementById('id_pdf');
+  const fileName = document.getElementById('fileName');
+  const uploadForm = document.getElementById('uploadForm');
+  const statusRow = document.getElementById('statusRow');
+  const statusMessage = document.getElementById('statusMessage');
+  const progressBar = document.getElementById('progressBar');
+  const sendBtn = document.getElementById('sendBtn');
+
+  // Ao selecionar arquivo
+  pdfInput.addEventListener('change', function () {
+    if (!this.files || !this.files[0]) {
+      fileName.textContent = 'Nenhum arquivo selecionado';
+      sendBtn.disabled = true;
+      return;
+    }
+    const f = this.files[0];
+    fileName.textContent = f.name;
+    const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      fileName.textContent = 'Por favor selecione um arquivo PDF (.pdf)';
+      sendBtn.disabled = true;
+      return;
+    }
+    sendBtn.disabled = false;
+    // Auto-submit ao selecionar um PDF válido
+    statusRow.classList.remove('d-none');
+    statusMessage.firstChild.textContent = 'Enviando e importando...';
+    progressBar.style.width = '35%';
+    progressBar.setAttribute('aria-valuenow', '35');
+    uploadForm.submit();
+  });
+
+  // Enviar (submit padrão + indicadores visuais)
+  sendBtn.addEventListener('click', function () {
+    if (pdfInput.files && pdfInput.files[0]) {
+      statusRow.classList.remove('d-none');
+      statusMessage.firstChild.textContent = 'Enviando e importando...';
+      progressBar.style.width = '35%';
+      progressBar.setAttribute('aria-valuenow', '35');
+      uploadForm.submit();
+      // Progresso visual simples (o server fará o real processamento)
+      setTimeout(() => {
+        progressBar.style.width = '70%';
+        progressBar.setAttribute('aria-valuenow', '70');
+      }, 500);
+    }
+  });
+</script>
+
+{% endblock %}

@@ -1,0 +1,412 @@
+{% extends 'base.html' %} {% block main%}
+{% load static %}
+<div class="container my-5 position-relative " style="padding: 30px !important; max-width: 1200px !important">
+  <div class="align-items-center d-flex justify-content-between title-proposal">
+    <h4 class="mb-0">Solicitações de Propostas Externas <i title="Copiar link do formulário" id="copyBtn"
+        style="cursor: pointer;" class="fa-solid fa-link"></i> </h4>
+
+  </div>
+
+  <table class="table" id="proposalTable">
+    <thead class="table-dark">
+      <tr>
+        <th scope="col">Nome</th>
+        <th scope="col">Email</th>
+        <th scope="col">Telefone</th>
+        <th scope="col">Data da proposta</th>
+        <th scope="col">Status</th>
+      </tr>
+    </thead>
+    <tbody id="myTable">
+      {% for proposal in proposals %}
+      <tr>
+        <th scope="row">{{ proposal.name }}</th>
+        <td>
+          <a href="#" class="open-modal" data-id="{{ proposal.id }}" data-email="{{ proposal.email }}"
+            data-phone="{{ proposal.phone }}" data-question_1="{{ proposal.question_1 }}"
+            data-question_2="{{ proposal.question_2 }}" data-question_3="{{ proposal.question_3 }}"
+            data-question_4="{{ proposal.question_4 }}" data-question_5="{{ proposal.question_5 }}"
+            data-question_6="{{ proposal.question_6 }}" data-question_7="{{ proposal.question_7 }}"
+            data-question_8="{{ proposal.question_8 }}" data-question_9="{{ proposal.question_9 }}"
+            data-question_10="{{ proposal.question_10 }}" data-question_11="{{ proposal.question_11 }}"
+            data-question_12="{{ proposal.question_12 }}" data-question_13="{{ proposal.question_13 }}"
+            data-question_14="{{ proposal.question_14 }}" data-question_15="{{ proposal.question_15 }}"
+            data-question_16="{{ proposal.question_16 }}" data-question_17="{{ proposal.question_17 }}"
+            data-question_18="{{ proposal.question_18 }}" data-question_19="{{ proposal.question_19 }}"
+            data-question_20="{{ proposal.question_20 }}" data-question_21="{{ proposal.question_21 }}"
+            data-question_22="{{ proposal.question_22 }}" data-question_23="{{ proposal.question_23 }}"
+            data-question_24="{{ proposal.question_24 }}" data-date="{{ proposal.created_at|date:'d/m/Y' }}">
+            {{ proposal.email }}</a>
+        </td>
+        <td>{{ proposal.phone }}</td>
+        <td>{{ proposal.created_at|date:'d/m/Y' }}</td>
+        <td>
+          {% if proposal.completed %}
+          <a href="#" class="generateProposal" data-id="{{ proposal.id }}" data-email="{{ proposal.email }}"
+            data-phone="{{ proposal.phone }}" data-question_1="{{ proposal.question_1 }}"
+            data-question_2="{{ proposal.question_2 }}" data-question_3="{{ proposal.question_3 }}"
+            data-question_4="{{ proposal.question_4 }}" data-question_5="{{ proposal.question_5 }}"
+            data-question_6="{{ proposal.question_6 }}" data-question_7="{{ proposal.question_7 }}"
+            data-question_8="{{ proposal.question_8 }}" data-question_9="{{ proposal.question_9 }}"
+            data-question_10="{{ proposal.question_10 }}" data-question_11="{{ proposal.question_11 }}"
+            data-question_12="{{ proposal.question_12 }}" data-question_13="{{ proposal.question_13 }}"
+            data-question_14="{{ proposal.question_14 }}" data-question_15="{{ proposal.question_15 }}"
+            data-question_16="{{ proposal.question_16 }}" data-question_17="{{ proposal.question_17 }}"
+            data-question_18="{{ proposal.question_18 }}" data-question_19="{{ proposal.question_19 }}"
+            data-question_20="{{ proposal.question_20 }}" data-question_21="{{ proposal.question_21 }}"
+            data-question_22="{{ proposal.question_22 }}" data-question_23="{{ proposal.question_23 }}"
+            data-question_24="{{ proposal.question_24 }}" data-date="{{ proposal.created_at|date:'d/m/Y' }}">
+            <div class="badge badge-pill badge-success p-2">
+              Gerar Proposta
+              <i class="fa-solid fa-file-export"></i>
+            </div>
+          </a>
+          {% else %}
+          <div class="badge badge-pill badge-warning bg-secondary p-2">Pendente</div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="proposalModal" tabindex="-1" role="dialog" aria-labelledby="proposalModalLabel"
+  aria-hidden="true">
+  <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="proposalModalLabel">
+          Detalhes da Solicitação
+        </h5>
+        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="proposalForm" method="POST">
+          <input type="hidden" id="csrfToken" value="{{ csrf_token }}" />
+          <input type="hidden" id="modalId" />
+          <h4>Cliente</h4>
+          <hr />
+          <div class="form-group">
+            <label for="modalQuestion1">Empresa</label>
+            <input type="text" class="form-control" id="modalQuestion1" name="question_1" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion2">Ramo</label>
+            <input type="text" class="form-control" id="modalQuestion2" name="question_2" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion3">Principal negócio</label>
+            <input type="text" class="form-control" id="modalQuestion3" name="question_3" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion4">Colaboradores</label>
+            <input type="text" class="form-control" id="modalQuestion4" name="question_4" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion5">Qual a missão, visão e valores da empresa?</label>
+            <input type="text" class="form-control" id="modalQuestion5" name="question_5" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion6">Quais os diferenciais essenciais da empresa?</label>
+            <input type="text" class="form-control" id="modalQuestion6" name="question_6" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion7">Quais suas principais necessidades? Como podemos
+              ajuda-los?</label>
+            <input type="text" class="form-control" id="modalQuestion7" name="question_7" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion8">Essas necessidades foram geradas em função de algum problema em
+              especial? Como surgiu essa demanda?</label>
+            <input type="text" class="form-control" id="modalQuestion8" name="question_8" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion9">Além das necessidades relatadas, existe alguma outra que você
+              gostaria de relatar?</label>
+            <input type="text" class="form-control" id="modalQuestion9" name="question_9" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion10">Qual o objetivo principal da capacitação?</label>
+            <input type="text" class="form-control" id="modalQuestion10" name="question_10" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion11">Quais os principais temas que você acredita que devem ser
+              trabalhados nesta formação?</label>
+            <input type="text" class="form-control" id="modalQuestion11" name="question_11" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion12">Quem deverá participar da capacitação? (público-alvo) Quantas
+              pessoas aproximadamente?</label>
+            <input type="text" class="form-control" id="modalQuestion12" name="question_12" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion13">Qual o nível médio de formação(escolaridade) do
+              público-alvo?</label>
+            <input type="text" class="form-control" id="modalQuestion13" name="question_13" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion14">A capacitação fará parte de um programa de treinamento?</label>
+            <input type="text" class="form-control" id="modalQuestion14" name="question_14" disabled />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion15">Outras observações</label>
+            <input type="text" class="form-control" id="modalQuestion15" name="question_15" disabled />
+          </div>
+
+          <h4>Senac</h4>
+          <hr />
+          <div class="form-group">
+            <label for="modalQuestion16">Sugestão de Título do curso</label>
+            <input type="text" class="form-control" id="modalQuestion16" name="question_16" />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion17">Tipo de curso</label>
+            <input type="text" class="form-control" id="modalQuestion17" name="question_17" />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion18">Eixo</label>
+            <input type="text" class="form-control" id="modalQuestion18" name="question_18" />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion19">Segmento</label>
+            <input type="text" class="form-control" id="modalQuestion19" name="question_19" />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion20">Carga Horária Sugerida</label>
+            <input type="text" class="form-control" id="modalQuestion20" name="question_20" />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion21">Escolaridade mínima necessária</label>
+            <input type="text" class="form-control" id="modalQuestion21" name="question_21" />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion22">Idade mínima necessária</label>
+            <input type="text" class="form-control" id="modalQuestion22" name="question_22" />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion23">Objetivo do Curso</label>
+            <input type="text" class="form-control" id="modalQuestion23" name="question_23" />
+          </div>
+          <div class="form-group">
+            <label for="modalQuestion24">Elementos</label>
+            <input type="text" class="form-control" id="modalQuestion24" name="question_24" />
+          </div>
+          <div class="modal-footer">
+            <button type="reset" class="btn btn-secondary" data-bs-dismiss="modal">
+              Fechar
+            </button>
+            <button type="button" id="update_proposal" class="btn btn-success">
+              Salvar Proposta
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+
+  new DataTable('#proposalTable', {
+    "language": {
+      "url": `{% static 'Portuguese-Brasil.json' %}`,
+      "search": "",
+      "searchPlaceholder": "Buscar Proposta" 
+    },
+    "pageLength": 9,
+    "pagingType": "numbers",
+    "lengthChange": false,
+    "info": false,
+    "columnDefs": [
+      { "orderable": false, "targets": [-1, -2] }
+    ]
+  });
+
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    // O link que será copiado
+    var link = "{{ request.scheme }}://{{ request.get_host }}{% url 'briefing' %}";
+
+    // Copiando o texto para a área de transferência
+    navigator.clipboard.writeText(link).catch(function (err) {
+      console.error('Falha ao copiar o link', err);
+    });
+  });
+
+
+  $(document).ready(function () {
+
+    $(".open-modal").on("click", function () {
+      var id = $(this).data("id");
+      var email = $(this).data("email");
+      var phone = $(this).data("phone");
+      var date = $(this).data("date");
+
+      $("#modalId").val(id);
+
+      for (var i = 1; i <= 24; i++) {
+        var question = $(this).data("question_" + i);
+        $("#modalQuestion" + i).val(question);
+      }
+
+      $("#proposalModal").modal("show");
+    });
+
+    $(document).on("click", ".generateProposal", function () {
+      console.log('Gerando proposta...');
+
+      var prompt = `
+            Você é um sistema de geração de propostas corporativas. 
+            Informações fornecidas pelo cliente: 
+                "Empresa": ${$(this).data("question_1")},
+                "Ramo": ${$(this).data("question_2")},
+                "Principal negócio": ${$(this).data("question_3")},
+                "Colaboradores": ${$(this).data("question_4")},
+                "Qual a missão, visão e valores da empresa?": ${$(this).data(
+        "question_5"
+      )},
+                "Quais os diferenciais essenciais da empresa?": ${$(this).data(
+        "question_6"
+      )},
+                "Quais suas principais necessidades? Como podemos ajuda-los?": ${$(
+        this
+      ).data("question_7")},
+                "Essas necessidades foram geradas em função de algum problema em especial? Como surgiu essa demanda?": ${$(
+        this
+      ).data("question_8")},
+                "Além das necessidades relatadas, existe alguma outra que você gostaria de relatar?": ${$(
+        this
+      ).data("question_9")},
+                "Qual o objetivo principal da capacitação?": ${$(this).data(
+        "question_10"
+      )},
+                "Quais os principais temas que você acredita que devem ser trabalhados nesta formação?": ${$(
+        this
+      ).data("question_11")},
+                "Quem deverá participar da capacitação? (público-alvo) Quantas pessoas aproximadamente?": ${$(
+        this
+      ).data("question_12")},
+                "Qual o nível médio de formação(escolaridade) do público-alvo?": ${$(
+        this
+      ).data("question_13")},
+                "A capacitação fará parte de um programa de treinamento?": ${$(
+        this
+      ).data("question_14")},
+                "Outras observações": ${$(this).data("question_15")},
+                "Sugestão de Título do curso": ${$(this).data("question_16")},
+                "Tipo de curso": ${$(this).data("question_17")},
+                "Eixo": ${$(this).data("question_18")},
+                "Segmento": ${$(this).data("question_19")},
+                "Carga Horária Sugerida": ${$(this).data("question_20")},
+                "Escolaridade mínima necessária": ${$(this).data(
+        "question_21"
+      )},
+                "Idade mínima necessária": ${$(this).data("question_22")},
+                "Objetivo do Curso": ${$(this).data("question_23")},
+                "Elementos": ${$(this).data("question_24")}
+
+                Com base nas informações acima, gere uma proposta corporativa estruturada. 
+                Preencha todos os campos, mesmo que os valores sejam vazios ou não fornecidos.
+                A proposta deve ser bem contextualizada apresentando 2000 palavras, adicione mais informações aos valores já fornecidos, se necessário.
+                    `;
+
+      $.post(
+        "{% url 'send_message' %}",
+        {
+          message: prompt,
+          csrfmiddlewaretoken: "{{ csrf_token }}",
+        },
+        function (data) {
+          proposal = data.response;
+          console.log(proposal);
+
+          // $.ajax({
+          //     url: "{% url 'download_doc' %}",
+          //     type: "POST",
+          //     data: {
+          //         'proposal': proposal,
+          //         'csrfmiddlewaretoken': '{{ csrf_token }}'
+          //     },
+          //     xhrFields: {
+          //         responseType: 'blob'
+          //     },
+          //     success: function (blob) {
+          //         var url = window.URL.createObjectURL(blob);
+          //         var a = document.createElement('a');
+          //         a.href = url;
+          //         a.download = 'proposta.doc';
+          //         document.body.appendChild(a);
+          //         a.click();
+          //         window.URL.revokeObjectURL(url);
+          //         document.body.removeChild(a);
+          //         console.log('Download gerado com sucesso.');
+          //     },
+          //     error: function (xhr, status, error) {
+          //         console.log(`Erro: ${error}`);
+          //     }
+          // });
+        }
+      );
+    });
+
+    $(document).on("click", "#update_proposal", function () {
+      var csrfToken = $("#csrfToken").val();
+      var id = $("#modalId").val();
+      var formData = {
+        csrfmiddlewaretoken: csrfToken,
+        id: id,
+      };
+
+      console.log(formData);
+
+      for (var i = 1; i <= 24; i++) {
+        formData["question_" + i] = $("#modalQuestion" + i).val();
+      }
+
+      $.ajax({
+        url: "{% url 'update-proposal' %}",
+        type: "POST",
+        data: formData,
+        success: function (response) {
+          alert("Proposta atualizada.");
+          window.location.replace('{% url "list-proposals" %}');
+        },
+        error: function (xhr, status, error) {
+          console.log(`Erro: ${error}`);
+        },
+      });
+    });
+  });
+</script>
+
+{% endblock %}
+
+<!-- Você é um sistema de geração de propostas corporativas. 
+Com base nas informações fornecidas pelo cliente abaixo, gere uma proposta corporativa estruturada. 
+A sua resposta deve ser um JSON, seguindo rigorosamente a estrutura fornecida. Preencha todos os campos, mesmo que os valores sejam vazios ou não fornecidos.
+Informações fornecidas pelo cliente: ${JSON.stringify(newProposal)}.
+Estrutura de JSON esperada: 
+{"data": "",
+    "cliente": "",
+    "destinatario": "",
+    "titulo": "",
+    "objetivo": "",
+    "periodo": "",
+    "detalhamento_proposta": [
+        {
+            "titulo_etapa": "",
+            "carga_horaria_necessaria": "",
+            "publico_alvo": "",
+            "objetivo_da_etapa": "",
+            "conteudo_programatico": [
+            ],
+        },
+    ],
+    "carga_horaria_total": "",
+    "valor_investimento": ""} -->

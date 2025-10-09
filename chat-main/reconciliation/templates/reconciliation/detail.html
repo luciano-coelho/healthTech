@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+{% load reconciliation_extras %}
+{% load static %}
+{% block main %}
+<div class="container recon-container mt-4">
+  <h3>Demonstrativo: {{ header.repasse_numero }} - {{ header.competencia }}</h3>
+  <p><strong>Terceiro:</strong> {{ header.terceiro_nome }} | <strong>CNPJ:</strong> {{ header.cnpj }} | <strong>Previsão:</strong> {{ header.previsao_pagamento }}</p>
+  <p><strong>Profissional:</strong> {{ header.profissional_nome }}</p>
+
+  {% if messages %}
+  <div class="mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}" role="alert">{{ message|safe }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <hr/>
+  {% if header.items.count %}
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;">
+  <div class="d-flex justify-content-between flex-wrap" style="gap:24px">
+          <div>
+            <div class="text-muted">Itens</div>
+            <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.count }}</div>
+          </div>
+          <div>
+            <div class="text-muted">Qtd total</div>
+            <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.total_qtd|default:'0' }}</div>
+          </div>
+          <div>
+            <div class="text-muted">Bruto</div>
+            <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.bruto|brl }}</div>
+          </div>
+          <div>
+            <div class="text-muted">Impostos</div>
+            <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.impostos|brl }}</div>
+          </div>
+          <div>
+            <div class="text-muted">Líquido (calculado)</div>
+            <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.liquido_calculado|brl }}</div>
+          </div>
+          <div>
+            <div class="text-muted">Líquido (informado)</div>
+            <div class="h5 mb-0 text-dark font-weight-bold">{{ summary.liquido_informado|brl }}</div>
+          </div>
+          <div>
+            <div class="text-muted">Diferença</div>
+            <div class="h5 mb-0 font-weight-bold {% if summary.diferenca and summary.diferenca != 0 %}diff-highlight{% else %}text-dark{% endif %}">
+              {{ summary.diferenca|brl }}
+              {% if summary.diferenca and summary.diferenca != 0 and summary.percent_diferenca %}
+                <small class="ml-1" style="font-weight:600;">({{ summary.percent_diferenca|pct }})</small>
+              {% endif %}
+            </div>
+          </div>
+          <div class="flex-break"></div>
+          <div>
+            <div class="text-muted">Taxa média de impostos</div>
+            <div class="h5 mb-0 text-dark font-weight-bold">{% if summary.taxa_media_impostos %}{{ summary.taxa_media_impostos|pct }}{% else %}-{% endif %}</div>
+          </div>
+          <!-- Percentual incorporado na linha de Diferença quando existir -->
+          <div>
+            <div class="text-muted">Procedimento mais rentável</div>
+            <div class="h6 mb-0 text-dark font-weight-bold">
+              {% if summary.top_procedimento_nome %}
+                {{ summary.top_procedimento_valor|brl }}
+                <small class="text-muted d-block" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ summary.top_procedimento_nome }}">{{ summary.top_procedimento_nome }}</small>
+              {% else %}-{% endif %}
+            </div>
+          </div>
+          <div>
+            <div class="text-muted">Convênio mais rentável</div>
+            <div class="h6 mb-0 text-dark font-weight-bold">
+              {% if summary.top_convenio_nome %}
+                {{ summary.top_convenio_valor|brl }}
+                <small class="text-muted d-block">{{ summary.top_convenio_nome }}</small>
+              {% else %}-{% endif %}
+            </div>
+          </div>
+          <div>
+            <div class="text-muted">Pior convênio (imposto sobre lucro)</div>
+            <div class="h6 mb-0 text-dark font-weight-bold">
+              {% if summary.worst_convenio_nome %}
+                <span title="Lucro: {{ summary.worst_convenio_lucro|brl }} | Imposto: {{ summary.worst_convenio_imposto|brl }}">
+                  {{ summary.worst_convenio_nome }} —
+                  {% if summary.worst_convenio_percent %}
+                    {{ summary.worst_convenio_percent|pct }}
+                  {% else %}-{% endif %}
+                </span>
+              {% else %}-{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% if summary.alerts and summary.alerts|length %}
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;">
+        <div class="h6 mb-2">Insights</div>
+        <ul class="mb-0">
+          {% for a in summary.alerts %}
+            <li class="mb-1">
+              {% if a.tipo == 'lucro_menor_que_imposto' %}
+                Convênio <strong>{{ a.convenio }}</strong>: lucro {{ a.lucro|brl }} menor que imposto {{ a.imposto|brl }} (dif {{ a.diferenca|brl }} {% if a.percent %} / {{ a.percent|pct }}{% endif %}).
+              {% elif a.tipo == 'lucro_quase_igual_imposto' %}
+                Convênio <strong>{{ a.convenio }}</strong>: lucro {{ a.lucro|brl }} quase igual ao imposto {{ a.imposto|brl }} (dif {{ a.diferenca|brl }} {% if a.percent %} / {{ a.percent|pct }}{% endif %}).
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  <h5>Itens</h5>
+  <div class="table-responsive">
+    <table class="table table-sm table-striped">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Paciente</th>
+          <th>Convênio</th>
+          <th>Categoria</th>
+          <th>Código</th>
+          <th>Procedimento</th>
+          <th style="text-align:right;">Qtd</th>
+          <th style="text-align:right;">Produzido</th>
+          <th style="text-align:right;">Imposto</th>
+          <th style="text-align:right;">Líquido</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in header.items.all %}
+        <tr>
+          <td>{{ it.data }}</td>
+          <td>{{ it.paciente }}</td>
+          <td>{{ it.convenio }}</td>
+          <td>{{ it.categoria }}</td>
+          <td>{{ it.codigo }}</td>
+          <td>{{ it.procedimento }}</td>
+          <td style="text-align:right;">{% if it.quantidade %}{{ it.quantidade|floatformat:2 }}{% endif %}</td>
+          <td style="text-align:right;">{% if it.valor_produzido %}{{ it.valor_produzido|brl }}{% endif %}</td>
+          <td style="text-align:right;">{% if it.imposto %}{{ it.imposto|brl }}{% endif %}</td>
+          <td style="text-align:right;">{% if it.valor_liquido %}{{ it.valor_liquido|brl }}{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10">
+            Nenhum item importado.
+            {% if header.original_file %}
+              <div class="mt-2">
+                <a href="{% url 'reprocess_remittance' header.id %}" class="btn btn-sm btn-outline-primary">
+                  Tentar reprocessar agora
+                </a>
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if header.items.count %}
+      <tfoot>
+        <tr class="totals-row">
+          <th colspan="6" class="totals-label-master">Totais:</th>
+          <th class="tfoot-cell text-right">
+            <span class="tfoot-label">Qtd</span>
+            <span class="tfoot-value">{{ summary.total_qtd|floatformat:0 }}</span>
+          </th>
+          <th class="tfoot-cell text-right">
+            <span class="tfoot-label">Bruto</span>
+            <span class="tfoot-value">{{ summary.bruto|brl }}</span>
+          </th>
+          <th class="tfoot-cell text-right">
+            <span class="tfoot-label">Impostos</span>
+            <span class="tfoot-value">{{ summary.impostos|brl }}</span>
+          </th>
+          <th class="tfoot-cell text-right">
+            <span class="tfoot-label">Líquido</span>
+            <span class="tfoot-value">{{ summary.liquido_informado|brl }}</span>
+          </th>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+
+  <!-- Chat flutuante GenIA (UI refinada) -->
+  <style>
+    /* Width override just for this demonstrativo page */
+  /* Expanded width (~+30%) to dar mais espaço aos dados */
+  .recon-container { max-width: 1155px !important; }
+  .qa-container { position: fixed; left: 20px; bottom: 20px; z-index: 1050; }
+  .qa-fab { display:inline-flex; align-items:center; justify-content:center; width:60px; height:60px; padding:4px; background:#fff; border-radius:50%; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.2); position:relative; border:3px solid #0D47A1; }
+  /* Avatar centralizado e completo (object-fit:contain) com anel branco interno */
+  .qa-fab img { width:100%; height:100%; border-radius:50%; object-fit:contain; object-position:center center; background:#fff; }
+  .assist-bubble { position:absolute; left:74px; bottom:6px; background:#2f2f2f; color:#fff; padding:12px 16px 14px; font-size:13px; line-height:1.25; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,.28); width:auto; max-width:none; opacity:0; transform:translateY(4px); pointer-events:none; transition:opacity .18s ease, transform .18s ease; display:inline-block; }
+  .assist-bubble .assist-line1 { font-weight:500; white-space:nowrap; }
+  .assist-bubble .assist-line2 { font-weight:600; white-space:nowrap; margin-top:4px; }
+  .assist-bubble:before { content:""; position:absolute; left:-7px; top:50%; width:14px; height:14px; background:#2f2f2f; transform:translateY(-50%) rotate(45deg); border-radius:2px; }
+  .assist-bubble strong { font-weight:600; }
+  .assist-bubble:before { content:""; position:absolute; left:-6px; top:22px; width:12px; height:12px; background:#2f2f2f; transform:rotate(45deg); border-radius:2px; }
+  .qa-fab:hover .assist-bubble { opacity:1; transform:translateY(0); }
+  .diff-highlight { color:#F47C20 !important; }
+  /* Totals footer styling */
+  tfoot .totals-row th { background:#fafafa; border-top:2px solid #0D47A1; vertical-align:top; }
+  .totals-label-master { text-align:right; font-weight:600; padding-right:12px; }
+  .tfoot-cell { min-width:90px; }
+  .tfoot-label { display:block; font-size:11px; font-weight:500; color:#4b5563; text-transform:uppercase; letter-spacing:.5px; line-height:1.1; margin-bottom:2px; }
+  .tfoot-value { display:block; font-weight:600; font-variant-numeric:tabular-nums; }
+  .tfoot-cell .tfoot-value { white-space:nowrap; }
+  .flex-break { flex-basis:100%; width:100%; height:0; }
+  .qa-window { width: 380px; max-height: 70vh; display:none; background:#fff; border-radius:16px 16px 0 0; box-shadow: 0 16px 40px rgba(0,0,0,.3); overflow:hidden; }
+  .qa-header { display:flex; align-items:center; gap:12px; padding:12px 16px; background:linear-gradient(135deg,#0D47A1 0%,#0149b8 55%,#1e3a8a 100%); color:#fff; }
+  .qa-header img { width:38px; height:38px; border-radius:50%; border:2px solid #0D47A1; outline:2px solid #fff; outline-offset:2px; object-fit:cover; object-position:center; background:#fff; box-shadow:0 0 0 1px rgba(255,255,255,.4); }
+  .qa-header-text { display:flex; flex-direction:column; line-height:1.1; }
+  .qa-header-text strong { font-size:15px; font-weight:600; }
+  /* Cabeçalho da tabela em azul (restaurado) */
+  .table thead th { background:#0D47A1 !important; color:#fff !important; border-bottom:3px solid #0B3C85 !important; font-weight:600; }
+  .table thead th:first-child { border-top-left-radius:4px; }
+  .table thead th:last-child { border-top-right-radius:4px; }
+  .qa-subtitle { font-size:12px; font-weight:400; opacity:.85; margin-top:2px; }
+    .qa-close { margin-left:auto; cursor:pointer; opacity:.85; }
+  .qa-body { height: 340px; overflow:auto; background:#f8fafc; padding:10px; }
+    .qa-footer { padding:8px; border-top:1px solid #e5e7eb; background:#fff; }
+  .qa-bubble { max-width:85%; padding:8px 10px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; color:#111; overflow-wrap: anywhere; overflow: hidden; }
+  /* Keep list markers inside the bubble */
+  .qa-bubble ul { list-style-type: disc; list-style-position: inside; padding-left: .5rem; margin: .25rem 0 .5rem; }
+  .qa-bubble li { margin-left: 0; }
+    .qa-row { display:flex; margin-bottom:8px; }
+    .qa-row.user { justify-content: flex-end; }
+  .qa-row.user .qa-bubble { background:#2563eb; color:#fff; border-color:#1d4ed8; }
+  /* layout shift removed */
+    @media (max-width: 576px) { .qa-window { width: calc(100vw - 24px); } }
+  </style>
+
+  <div class="qa-container">
+    <div id="qa-window" class="qa-window" aria-live="polite" aria-label="Chat GenIA">
+  <div class="qa-header">
+  <img src="{% static 'img/larissa-avatar.png' %}" alt="Larissa">
+    <div class="qa-header-text">
+      <strong>Larissa</strong>
+      <span class="qa-subtitle">Assistente</span>
+    </div>
+        <span id="qa-close" class="qa-close" aria-label="Fechar">✕</span>
+      </div>
+      <div id="qa-messages" class="qa-body">
+        <div class="qa-row">
+          <div class="qa-bubble">Olá! Posso responder perguntas sobre este demonstrativo. Ex.: "Qual convênio mais rentável?" ou "Quanto foi o líquido no total?".</div>
+        </div>
+      </div>
+      <div class="qa-footer">
+        <form id="qa-form">
+          <div class="input-group">
+            <input type="text" class="form-control" id="qa-input" placeholder="Escreva sua pergunta..." autocomplete="off" required>
+            <div class="input-group-append"><button class="btn btn-primary" type="submit">Enviar</button></div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="qa-fab" class="qa-fab" role="button" aria-label="Abrir chat com GenIA" title="Abrir chat">
+  <img id="qa-avatar" src="{% static 'img/larissa-avatar.png' %}?v=1" alt="Larissa" loading="lazy">
+      <div id="assist-bubble" class="assist-bubble">
+        <div class="assist-line1">Olá, precisa de ajuda?</div>
+        <div class="assist-line2">Pergunte à <strong>Larissa!</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+  const fab = document.getElementById('qa-fab');
+      const win = document.getElementById('qa-window');
+      const closeBtn = document.getElementById('qa-close');
+      const form = document.getElementById('qa-form');
+      const input = document.getElementById('qa-input');
+  const msgs = document.getElementById('qa-messages');
+  function show(){ win.style.display='block'; fab.style.display='none'; setTimeout(()=>{ msgs.scrollTop = msgs.scrollHeight; }, 0); }
+  function hide(){ win.style.display='none'; fab.style.display='inline-flex'; }
+      function scrollBottom(){ msgs.scrollTop = msgs.scrollHeight; }
+      function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+      function mdToHtml(md){
+        // Minimal markdown: paragraphs, lists (- or *), **bold**, *italic*.
+        // Line-by-line parser to support mixed content without dropping lines.
+        const fmtInline = (s) => s
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1<\/strong>')
+          .replace(/\*(.+?)\*/g, '<em>$1<\/em>');
+        const lines = md.split('\n');
+        let out = '';
+        let inList = false;
+        for (let i = 0; i < lines.length; i++) {
+          const raw = lines[i];
+          const esc = escapeHtml(raw);
+          const m = esc.match(/^\s*[-*]\s+(.+)$/);
+          if (m) {
+            if (!inList) { out += '<ul class="mb-2">'; inList = true; }
+            out += '<li>' + fmtInline(m[1]) + '</li>';
+          } else {
+            if (inList) { out += '</ul>'; inList = false; }
+            const trimmed = esc.trim();
+            if (trimmed) {
+              out += '<p class="mb-2">' + fmtInline(esc) + '</p>';
+            } else {
+              out += '<br>';
+            }
+          }
+        }
+        if (inList) out += '</ul>';
+        return out;
+      }
+  fab.addEventListener('click', show);
+
+      // (Simplified) Removed fallback chain; using direct PNG with cache-busting query.
+      closeBtn.addEventListener('click', hide);
+      // Suggestions removed per request
+      form.addEventListener('submit', async (e)=>{
+        e.preventDefault();
+    const q = input.value.trim(); if(!q) return; input.value='';
+    msgs.insertAdjacentHTML('beforeend', '<div class="qa-row user"><div class="qa-bubble">'+q.replace(/</g,'&lt;')+'</div></div>');
+        scrollBottom();
+        const id = 'ld_'+Date.now(); msgs.insertAdjacentHTML('beforeend', '<div id="'+id+'" class="qa-row"><div class="qa-bubble">Pensando...</div></div>');
+        scrollBottom();
+        try{
+          const resp = await fetch("{% url 'qa_remittance' header.id %}", { method:'POST', headers:{ 'X-CSRFToken':'{{ csrf_token }}' }, body:new URLSearchParams({ q }) });
+          const data = await resp.json();
+          document.getElementById(id)?.remove();
+          const text = (data && data.answer) ? data.answer : 'Não consegui responder agora.';
+          msgs.insertAdjacentHTML('beforeend', '<div class="qa-row"><div class="qa-bubble">'+mdToHtml(text)+'</div></div>');
+        }catch(err){
+          document.getElementById(id)?.remove();
+          const text = 'Falha ao consultar a GenIA.';
+          msgs.insertAdjacentHTML('beforeend', '<div class="qa-row"><div class="qa-bubble" style="background:#fff3cd;border-color:#ffe69c;">'+text+'</div></div>');
+        }
+        scrollBottom();
+      });
+      // Copy/Export removed per request
+    })();
+  </script>
+</div>
+{% endblock %}
