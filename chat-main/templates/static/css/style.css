@@ -161,9 +161,21 @@ body {
 
 
 
+/* Generic logo size (can be overridden for specific placements) */
 .logo{
     width: 100px;
     height: auto;
+}
+
+/* Top menu logo image: increase ~20% (30px -> 36px) */
+.menu .logo img{
+    height: 30px;
+    width: auto;
+}
+
+/* Top menu logo container width (+20% from 100px -> 120px) */
+.menu .logo{
+    width: 110px; /* container width tuned for 30px logo height */
 }
 
 body {
@@ -228,6 +240,7 @@ body {
     height: 110px;
     display: -webkit-box;
     -webkit-box-orient: vertical;
+    line-clamp: 4;
     -webkit-line-clamp: 4;
     overflow: hidden;
     text-overflow: ellipsis;
