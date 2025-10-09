@@ -1,0 +1,7 @@
+# Repo root ignores
+.venv/
+.env
+.env.*
+*.env
+.DS_Store
+Thumbs.db
