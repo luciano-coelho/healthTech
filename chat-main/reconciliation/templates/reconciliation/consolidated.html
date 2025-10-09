@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load reconciliation_extras %}
+{% load static %}
 
 {% block main %}
 <div class="container recon-container mt-4">
@@ -306,6 +307,32 @@
   .diff-highlight { color:#F47C20 !important; }
   .recon-container { max-width: 1155px !important; }
   .section-divider { border-top:2px solid #e5e7eb; margin: 10px 0 16px; }
+  /* Chat flutuante (mesma base do detalhe) */
+  .qa-container { position: fixed; left: 20px; bottom: 20px; z-index: 1050; }
+  .qa-fab { display:inline-flex; align-items:center; justify-content:center; width:60px; height:60px; padding:4px; background:#fff; border-radius:50%; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.2); position:relative; border:3px solid #0D47A1; }
+  .qa-fab img { width:100%; height:100%; border-radius:50%; object-fit:contain; object-position:center center; background:#fff; }
+  .assist-bubble { position:absolute; left:74px; bottom:6px; background:#2f2f2f; color:#fff; padding:12px 16px 14px; font-size:13px; line-height:1.25; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,.28); width:auto; max-width:none; opacity:0; transform:translateY(4px); pointer-events:none; transition:opacity .18s ease, transform .18s ease; display:inline-block; }
+  .assist-bubble .assist-line1 { font-weight:500; white-space:nowrap; }
+  .assist-bubble .assist-line2 { font-weight:600; white-space:nowrap; margin-top:4px; }
+  .assist-bubble:before { content:""; position:absolute; left:-6px; top:22px; width:12px; height:12px; background:#2f2f2f; transform:rotate(45deg); border-radius:2px; }
+  .qa-fab:hover .assist-bubble { opacity:1; transform:translateY(0); }
+  .qa-window { width: 380px; max-height: 70vh; display:none; background:#fff; border-radius:16px 16px 0 0; box-shadow: 0 16px 40px rgba(0,0,0,.3); overflow:hidden; }
+  .qa-header { display:flex; align-items:center; gap:12px; padding:12px 16px; background:linear-gradient(135deg,#0D47A1 0%,#0149b8 55%,#1e3a8a 100%); color:#fff; }
+  .qa-header img { width:38px; height:38px; border-radius:50%; border:2px solid #0D47A1; outline:2px solid #fff; outline-offset:2px; object-fit:cover; object-position:center; background:#fff; box-shadow:0 0 0 1px rgba(255,255,255,.4); }
+  .qa-header-text { display:flex; flex-direction:column; line-height:1.1; }
+  .qa-header-text strong { font-size:15px; font-weight:600; }
+  .qa-subtitle { font-size:12px; font-weight:400; opacity:.85; margin-top:2px; }
+  .qa-close { margin-left:auto; cursor:pointer; opacity:.85; }
+  .qa-body { height: 340px; overflow:auto; background:#f8fafc; padding:10px; }
+  .qa-footer { padding:8px; border-top:1px solid #e5e7eb; background:#fff; }
+  .qa-bubble { max-width:85%; padding:8px 10px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; color:#111; overflow-wrap: anywhere; overflow: hidden; }
+  /* Listas dentro do balão */
+  .qa-bubble ul { list-style-type: disc; list-style-position: inside; padding-left: .5rem; margin: .25rem 0 .5rem; }
+  .qa-bubble li { margin-left: 0; }
+  .qa-row { display:flex; margin-bottom:8px; }
+  .qa-row.user { justify-content: flex-end; }
+  .qa-row.user .qa-bubble { background:#2563eb; color:#fff; border-color:#1d4ed8; }
+  @media (max-width: 576px) { .qa-window { width: calc(100vw - 24px); } }
 </style>
 
 <script>
@@ -343,6 +370,107 @@
       });
     }
   })();
+</script>
+
+<!-- Chat consolidado (considera toda a página) -->
+<div class="qa-container">
+  <div id="qa-window" class="qa-window" aria-live="polite" aria-label="Chat GenIA">
+    <div class="qa-header">
+      <img src="{% static 'img/larissa-avatar.png' %}" alt="Larissa">
+      <div class="qa-header-text">
+        <strong>Larissa</strong>
+        <span class="qa-subtitle">Assistente</span>
+      </div>
+      <span id="qa-close" class="qa-close" aria-label="Fechar">✕</span>
+    </div>
+    <div id="qa-messages" class="qa-body">
+      <div class="qa-row">
+        <div class="qa-bubble">Olá! Posso responder perguntas sobre este consolidado (todos os profissionais). Ex.: "Qual o líquido total?" ou "Qual convênio mais rentável?"</div>
+      </div>
+    </div>
+    <div class="qa-footer">
+      <form id="qa-form">
+        <div class="input-group">
+          <input type="text" class="form-control" id="qa-input" placeholder="Escreva sua pergunta..." autocomplete="off" required>
+          <div class="input-group-append"><button class="btn btn-primary" type="submit">Enviar</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div id="qa-fab" class="qa-fab" role="button" aria-label="Abrir chat com GenIA" title="Abrir chat">
+    <img id="qa-avatar" src="{% static 'img/larissa-avatar.png' %}?v=1" alt="Larissa" loading="lazy">
+    <div id="assist-bubble" class="assist-bubble">
+      <div class="assist-line1">Olá, precisa de ajuda?</div>
+      <div class="assist-line2">Pergunte à <strong>Larissa!</strong></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const idsCsv = '{{ header_ids|join:"," }}';
+  const ids = idsCsv ? idsCsv.split(',').map(function(s){ return parseInt(s, 10); }) : [];
+  const fab = document.getElementById('qa-fab');
+  const win = document.getElementById('qa-window');
+  const closeBtn = document.getElementById('qa-close');
+  const form = document.getElementById('qa-form');
+  const input = document.getElementById('qa-input');
+  const msgs = document.getElementById('qa-messages');
+  function scrollBottom(){ msgs.scrollTop = msgs.scrollHeight; }
+  function show(){ win.style.display='block'; fab.style.display='none'; setTimeout(scrollBottom, 0); }
+  function hide(){ win.style.display='none'; fab.style.display='inline-flex'; }
+  function escapeHtml(s){ return s.replace(/[&<>]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]); }); }
+  function mdToHtml(md){
+    // Pré-processa bullets inline do tipo " ... * item ... * item ..."
+    md = md.replace(/\s\*\s+/g, '\n- ').replace(/\s•\s+/g, '\n- ');
+    const fmtInline = function(s){
+      return s
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1<\/strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1<\/em>');
+    };
+    const lines = md.split('\n');
+    let out = '';
+    let inList = false;
+    for (let i = 0; i < lines.length; i++){
+      const raw = lines[i];
+      const esc = escapeHtml(raw);
+      const m = esc.match(/^\s*[-*]\s+(.+)$/);
+      if (m){
+        if (!inList){ out += '<ul class="mb-2">'; inList = true; }
+        out += '<li>' + fmtInline(m[1]) + '</li>';
+      } else {
+        if (inList){ out += '</ul>'; inList = false; }
+        const trimmed = esc.trim();
+        if (trimmed){ out += '<p class="mb-2">' + fmtInline(esc) + '</p>'; }
+        else { out += '<br>'; }
+      }
+    }
+    if (inList) out += '</ul>';
+    return out;
+  }
+  fab.addEventListener('click', show);
+  closeBtn.addEventListener('click', hide);
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const q = input.value.trim(); if(!q) return; input.value='';
+    msgs.insertAdjacentHTML('beforeend', '<div class="qa-row user"><div class="qa-bubble">'+q.replace(/</g,'&lt;')+'</div></div>');
+    scrollBottom();
+    const id = 'ld_'+Date.now(); msgs.insertAdjacentHTML('beforeend', '<div id="'+id+'" class="qa-row"><div class="qa-bubble">Pensando...</div></div>');
+    scrollBottom();
+    try{
+      const resp = await fetch("{% url 'qa_consolidated' %}", { method:'POST', headers:{ 'X-CSRFToken':'{{ csrf_token }}' }, body:new URLSearchParams({ q, ids: idsCsv }) });
+      const data = await resp.json();
+      document.getElementById(id)?.remove();
+      const text = (data && data.answer) ? data.answer : 'Não consegui responder agora.';
+      msgs.insertAdjacentHTML('beforeend', '<div class="qa-row"><div class="qa-bubble">'+ mdToHtml(text) +'</div></div>');
+    }catch(err){
+      document.getElementById(id)?.remove();
+      const text = 'Falha ao consultar a GenIA.';
+      msgs.insertAdjacentHTML('beforeend', '<div class="qa-row"><div class="qa-bubble" style="background:#fff3cd;border-color:#ffe69c;">'+text+'</div></div>');
+    }
+    scrollBottom();
+  });
+})();
 </script>
 
 {% endblock %}

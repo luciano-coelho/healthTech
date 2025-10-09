@@ -225,6 +225,8 @@ def upload_remittance(request):
                         'competencia': hdrs[0].competencia,
                         'cnpj': hdrs[0].cnpj,
                         'previsao_pagamento': hdrs[0].previsao_pagamento,
+                        # IDs dos headers para o chat consolidado
+                        'header_ids': [h.id for h in hdrs],
                     })
                 hdr = hdrs[0]
             finally:
@@ -474,6 +476,118 @@ def qa_remittance(request, id: int):
         f"Tabela (campos separados por |):\n{table_text}\n\n"
         f"Pergunta: {question}\n\n"
         f"Responda considerando os dados acima. Se referir valores, formate como R$ 1.234,56."
+    )
+
+    ai_text = call_gemini_api(prompt) or "Não consegui responder agora. Tente reformular a pergunta."
+    return JsonResponse({'answer': ai_text})
+
+
+@login_required
+def qa_consolidated(request):
+    """Answer user questions about the consolidated page (multiple headers) using Gemini.
+
+    Expects POST with:
+      - q: user question
+      - ids: comma-separated list of RemittanceHeader IDs to include
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    question = request.POST.get('q', '').strip()
+    ids_csv = request.POST.get('ids', '').strip()
+    if not question:
+        return JsonResponse({'error': 'Pergunta vazia'}, status=400)
+    if not ids_csv:
+        return JsonResponse({'error': 'IDs ausentes'}, status=400)
+
+    try:
+        ids = [int(x) for x in ids_csv.split(',') if x.strip()]
+    except ValueError:
+        return JsonResponse({'error': 'IDs inválidos'}, status=400)
+    if not ids:
+        return JsonResponse({'error': 'IDs vazios'}, status=400)
+
+    headers = list(RemittanceHeader.objects.filter(id__in=ids).prefetch_related('items').all())
+    if not headers:
+        return JsonResponse({'error': 'Nenhum demonstrativo encontrado'}, status=404)
+
+    zero = Decimal('0.00')
+    # Totais consolidados
+    total_count = 0
+    total_qtd = Decimal('0')
+    total_bruto = zero
+    total_imposto = zero
+    total_liquido_info = zero
+
+    # Quebra por profissional
+    per_prof = []  # (nome, especialidade, itens, bruto, imposto, liquido_info)
+
+    # Linhas detalhadas (capadas) – adiciona o profissional no início
+    rows = []
+    header_row = "Profissional|Especialidade|Data|Paciente|Convênio|Categoria|Código|Procedimento|Qtd|Produzido|Imposto|Líquido"
+
+    for h in headers:
+        agg = h.items.aggregate(
+            total_qtd=Sum('quantidade'),
+            total_bruto=Sum('valor_produzido'),
+            total_imposto=Sum('imposto'),
+            total_liquido=Sum('valor_liquido'),
+        )
+        b = agg['total_bruto'] or zero
+        imp = agg['total_imposto'] or zero
+        li = agg['total_liquido'] or zero
+        per_prof.append((h.profissional_nome or '-', h.especialidade or '-', h.items.count(), b, imp, li))
+
+        total_count += h.items.count()
+        total_qtd += (agg['total_qtd'] or Decimal('0'))
+        total_bruto += b
+        total_imposto += imp
+        total_liquido_info += li
+
+        for it in h.items.all():
+            def fmt(v):
+                return '' if v is None else str(v)
+            rows.append("|".join([
+                h.profissional_nome or '-',
+                h.especialidade or '-',
+                it.data or '',
+                it.paciente or '',
+                it.convenio or '',
+                it.categoria or '',
+                it.codigo or '',
+                (it.procedimento or '')[:120],
+                fmt(it.quantidade),
+                fmt(it.valor_produzido),
+                fmt(it.imposto),
+                fmt(it.valor_liquido if it.valor_liquido is not None else ((it.valor_produzido or zero) - (it.imposto or zero)))
+            ]))
+
+    liquido_calc = total_bruto - total_imposto
+    summary_text = (
+        f"Consolidado de {len(headers)} profissionais. Itens={total_count}; "
+        f"Qtd_total={total_qtd}; Bruto={total_bruto}; Impostos={total_imposto}; "
+        f"Líquido_calculado={liquido_calc}; Líquido_informado={total_liquido_info}."
+    )
+
+    # Pequena tabela por profissional
+    per_prof_lines = ["Por profissional (itens, bruto, imposto, líquido informado):", ""]
+    for nome, esp, count, b, imp, li in per_prof:
+        per_prof_lines.append(f"- {nome} ({esp}): itens={count}, bruto={b}, imposto={imp}, líquido={li}")
+    per_prof_text = "\n".join(per_prof_lines)
+
+    table_text = "\n".join([header_row] + rows[:1200])  # segurança
+
+    sys_preamble = (
+        "Você é uma assistente financeira. Responda em português, de forma objetiva e com números em padrão brasileiro (R$ e vírgula decimal). "
+        "Use apenas os dados fornecidos no contexto (consolidado e por profissional). Ao fazer contas, explique em 1 linha quando útil. "
+        "Formate em Markdown simples (títulos curtos e listas com '-'), evitando tabelas e blocos de código."
+    )
+    prompt = (
+        f"{sys_preamble}\n\n"
+        f"{summary_text}\n\n{per_prof_text}\n\n"
+        f"Tabela (campos separados por |):\n{table_text}\n\n"
+        f"Pergunta: {question}\n\n"
+        f"Responda considerando TODOS os dados acima (consolidado e se necessário por profissional)."
     )
 
     ai_text = call_gemini_api(prompt) or "Não consegui responder agora. Tente reformular a pergunta."
