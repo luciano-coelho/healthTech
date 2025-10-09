@@ -1,5 +1,6 @@
 from django import template
 from decimal import Decimal, InvalidOperation
+from datetime import datetime, timedelta
 
 register = template.Library()
 
@@ -50,3 +51,39 @@ def _to_decimal(value) -> Decimal:
 def sub(value, arg):
     """Subtract arg from value, treating None/empty as 0 and keeping Decimal precision."""
     return _to_decimal(value) - _to_decimal(arg)
+
+
+def _parse_br_date(s: str):
+    """Parse dates like dd/mm or dd/mm/yy or dd/mm/yyyy. Returns datetime.date or None."""
+    if not s:
+        return None
+    s = str(s).strip()
+    fmts = ["%d/%m/%Y", "%d/%m/%y", "%d/%m"]
+    for f in fmts:
+        try:
+            dt = datetime.strptime(s, f)
+            # For dd/mm without year, assume current year first; if in future > 30 days, assume previous year
+            if f == "%d/%m":
+                today = datetime.today().date()
+                candidate = dt.replace(year=today.year).date()
+                if candidate - today > timedelta(days=30):
+                    candidate = dt.replace(year=today.year - 1).date()
+                return candidate
+            return dt.date()
+        except ValueError:
+            continue
+    return None
+
+
+@register.filter(name='is_older_than_days')
+def is_older_than_days(date_str, days=60):
+    """Return True if the given BR date string is older than N days from today."""
+    d = _parse_br_date(date_str)
+    if not d:
+        return False
+    try:
+        n = int(days)
+    except Exception:
+        n = 60
+    today = datetime.today().date()
+    return (today - d).days > n

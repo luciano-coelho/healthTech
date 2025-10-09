@@ -138,7 +138,7 @@
         {% for it in header.items.all %}
         <tr>
           <td>{{ it.atendimento }}</td>
-          <td>{{ it.data }}</td>
+          <td><span class="date-cell {% if it.data|is_older_than_days:60 %}text-danger{% endif %}">{{ it.data }}</span></td>
           <td>{{ it.paciente }}</td>
           <td>{{ it.convenio }}</td>
           <td>{{ it.categoria }}</td>

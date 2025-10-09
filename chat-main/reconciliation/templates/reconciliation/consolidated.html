@@ -5,7 +5,7 @@
 {% block main %}
 <div class="container recon-container mt-4">
   <div class="d-flex align-items-center justify-content-between mb-1">
-    <h4 class="mb-0">Demonstrativo: {{ repasse_numero }} - {{ competencia }}</h4>
+    <h5 class="mb-0">Demonstrativo: {{ repasse_numero }} - {{ competencia }}</h4>
     <a href="{% url 'upload_remittance' %}" class="btn btn-outline-secondary btn-sm">Voltar ao upload</a>
   </div>
   <p class="text-muted mb-3"><strong>Terceiro:</strong> {{ terceiro_nome }} | <strong>CNPJ:</strong> {{ cnpj }} | <strong>Previsão:</strong> {{ previsao_pagamento }}</p>
@@ -238,7 +238,7 @@
             {% for it in items %}
             <tr>
               <td>{{ it.atendimento }}</td>
-              <td>{{ it.data }}</td>
+              <td><span class="date-cell {% if it.data|is_older_than_days:60 %}text-danger{% endif %}">{{ it.data }}</span></td>
               <td>{{ it.paciente }}</td>
               <td>{{ it.convenio }}</td>
               <td>{{ it.categoria }}</td>
