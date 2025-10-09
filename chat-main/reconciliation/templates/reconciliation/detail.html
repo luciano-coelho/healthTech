@@ -118,36 +118,36 @@
   {% endif %}
   <h5>Itens</h5>
   <div class="table-responsive">
-    <table class="table table-sm table-striped">
+    <table class="table table-sm table-striped recon-table">
       <thead>
         <tr>
-          <th>Atendimento</th>
-          <th>Data</th>
-          <th>Paciente</th>
-          <th>Convênio</th>
-          <th>Categoria</th>
-          <th>Código</th>
-          <th>Procedimento</th>
-          <th style="text-align:right;">Qtd</th>
-          <th style="text-align:right;">Produzido</th>
-          <th style="text-align:right;">Imposto</th>
-          <th style="text-align:right;">Líquido</th>
+          <th class="col-atend sticky">Atendimento</th>
+          <th class="col-date sticky">Data</th>
+          <th class="col-paciente sticky">Paciente</th>
+          <th class="col-convenio sticky">Convênio</th>
+          <th class="col-categ sticky">Categoria</th>
+          <th class="col-codigo sticky">Código</th>
+          <th class="col-proc sticky">Procedimento</th>
+          <th class="col-qtd text-right sticky">Qtd</th>
+          <th class="col-money text-right sticky">Produzido</th>
+          <th class="col-money text-right sticky">Imposto</th>
+          <th class="col-money text-right sticky">Líquido</th>
         </tr>
       </thead>
       <tbody>
         {% for it in header.items.all %}
         <tr>
-          <td>{{ it.atendimento }}</td>
-          <td><span class="date-cell {% if it.data|is_older_than_days:60 %}text-danger{% endif %}">{{ it.data }}</span></td>
-          <td>{{ it.paciente }}</td>
-          <td>{{ it.convenio }}</td>
-          <td>{{ it.categoria }}</td>
-          <td>{{ it.codigo }}</td>
-          <td>{{ it.procedimento }}</td>
-          <td style="text-align:right;">{% if it.quantidade %}{{ it.quantidade|floatformat:2 }}{% endif %}</td>
-          <td style="text-align:right;">{% if it.valor_produzido %}{{ it.valor_produzido|brl }}{% endif %}</td>
-          <td style="text-align:right;">{% if it.imposto %}{{ it.imposto|brl }}{% endif %}</td>
-          <td style="text-align:right;">{% if it.valor_liquido %}{{ it.valor_liquido|brl }}{% endif %}</td>
+          <td class="col-atend"><span class="mono" title="Atendimento">{{ it.atendimento }}</span></td>
+          <td class="col-date"><span class="date-cell {% if it.data|is_older_than_days:60 %}text-danger{% endif %}" title="Data do atendimento">{{ it.data }}</span></td>
+          <td class="col-paciente" title="{{ it.paciente }}">{{ it.paciente }}</td>
+          <td class="col-convenio" title="{{ it.convenio }}">{{ it.convenio }}</td>
+          <td class="col-categ text-center">{{ it.categoria }}</td>
+          <td class="col-codigo text-center"><span class="mono" title="Código do procedimento">{{ it.codigo }}</span></td>
+          <td class="col-proc" title="{{ it.procedimento }}">{{ it.procedimento }}</td>
+          <td class="col-qtd text-right">{% if it.quantidade %}{{ it.quantidade|floatformat:2 }}{% endif %}</td>
+          <td class="col-money text-right">{% if it.valor_produzido %}{{ it.valor_produzido|brl }}{% endif %}</td>
+          <td class="col-money text-right">{% if it.imposto %}{{ it.imposto|brl }}{% endif %}</td>
+          <td class="col-money text-right">{% if it.valor_liquido %}{{ it.valor_liquido|brl }}{% endif %}</td>
         </tr>
         {% empty %}
         <tr>
@@ -194,7 +194,7 @@
   <style>
     /* Width override just for this demonstrativo page */
   /* Expanded width (~+30%) to dar mais espaço aos dados */
-  .recon-container { max-width: 1275px !important; }
+  .recon-container { max-width: 1400px !important; }
   .qa-container { position: fixed; left: 20px; bottom: 20px; z-index: 1050; }
   .qa-fab { display:inline-flex; align-items:center; justify-content:center; width:60px; height:60px; padding:4px; background:#fff; border-radius:50%; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.2); position:relative; border:3px solid #0D47A1; }
   /* Avatar centralizado e completo (object-fit:contain) com anel branco interno */
@@ -224,6 +224,22 @@
   .table thead th { background:#0D47A1 !important; color:#fff !important; border-bottom:3px solid #0B3C85 !important; font-weight:600; }
   .table thead th:first-child { border-top-left-radius:4px; }
   .table thead th:last-child { border-top-right-radius:4px; }
+  /* Sticky header for long lists */
+  .recon-table thead th.sticky { position: sticky; top: 0; z-index: 2; }
+  /* Column sizing & behavior */
+  .recon-table th, .recon-table td { vertical-align: middle; padding: .55rem .6rem; }
+  .recon-table .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-variant-numeric: tabular-nums; }
+  .recon-table .col-atend { width: 110px; white-space: nowrap; }
+  .recon-table .col-date { width: 110px; white-space: nowrap; }
+  .recon-table .col-paciente { width: 220px; min-width: 200px; }
+  .recon-table .col-convenio { width: 140px; }
+  .recon-table .col-categ { width: 80px; white-space: nowrap; }
+  .recon-table .col-codigo { width: 120px; white-space: nowrap; }
+  .recon-table .col-proc { width: 360px; min-width: 320px; white-space: normal; word-break: break-word; }
+  .recon-table .col-qtd { width: 70px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .recon-table .col-money { width: 120px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* Row hover for readability */
+  .recon-table tbody tr:hover { background: #f1f5f9 !important; }
   .qa-subtitle { font-size:12px; font-weight:400; opacity:.85; margin-top:2px; }
     .qa-close { margin-left:auto; cursor:pointer; opacity:.85; }
   .qa-body { height: 340px; overflow:auto; background:#f8fafc; padding:10px; }

@@ -3,10 +3,13 @@
 {% load static %}
 
 {% block main %}
-<div class="container recon-container mt-4">
+<div class="container recon-container mt-4" data-previsao="{{ previsao_pagamento|default:'' }}">
   <div class="d-flex align-items-center justify-content-between mb-1">
-    <h5 class="mb-0">Demonstrativo: {{ repasse_numero }} - {{ competencia }}</h4>
-    <a href="{% url 'upload_remittance' %}" class="btn btn-outline-secondary btn-sm">Voltar ao upload</a>
+    <h5 class="mb-0">Demonstrativo: {{ repasse_numero }} - {{ competencia }}</h5>
+    <div class="d-flex align-items-center" style="gap:8px;">
+      <a href="{% url 'upload_remittance' %}" class="btn btn-outline-secondary btn-sm">Voltar ao upload</a>
+      <button type="button" class="btn btn-primary btn-sm" id="open-dashboard">Dashboard</button>
+    </div>
   </div>
   <p class="text-muted mb-3"><strong>Terceiro:</strong> {{ terceiro_nome }} | <strong>CNPJ:</strong> {{ cnpj }} | <strong>Previsão:</strong> {{ previsao_pagamento }}</p>
 
@@ -218,7 +221,7 @@
 
       <h5>Itens</h5>
       <div class="table-responsive">
-        <table class="table table-sm table-striped">
+  <table class="table table-sm table-striped" data-prof-id="{{ header.id }}" data-prof-name="{{ header.profissional_nome }}" data-previsao="{{ header.previsao_pagamento }}">
           <thead>
             <tr>
               <th>Atendimento</th>
@@ -475,4 +478,306 @@
 })();
 </script>
 
+<!-- Dashboard Modal -->
+<div id="dashboard-modal" class="dash-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="dash-title" style="display:none;">
+  <div class="dash-backdrop" data-dash="close"></div>
+  <div class="dash-dialog" role="document">
+    <div class="dash-header">
+      <h5 id="dash-title" class="mb-0">Dashboard — Visão geral</h5>
+      <button type="button" class="dash-close" aria-label="Fechar" data-dash="close">✕</button>
+    </div>
+    <div class="dash-body">
+      <div class="dash-grid">
+        <div class="dash-card">
+          <div class="dash-card-title">Top convênios por lucro</div>
+          <div class="dash-chart" id="chart-convenios"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title">Top procedimentos por lucro</div>
+          <div class="dash-chart" id="chart-procedimentos"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title">Top clientes por lucro (Top 3 / Bottom 3)</div>
+          <div class="dash-chart" id="chart-clientes-lucro"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title">Top clientes por quantidade de procedimentos (Top 3 / Bottom 3)</div>
+          <div class="dash-chart" id="chart-clientes-proc"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title">Distribuição por profissional (bruto)</div>
+          <div class="dash-chart" id="chart-profissionais"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title">Prazo (45/60+ dias)</div>
+          <div class="dash-chart" id="chart-prazos"></div>
+        </div>
+      </div>
+    </div>
+    <div class="dash-footer">
+      <button type="button" class="btn btn-light" data-dash="close">Fechar</button>
+    </div>
+  </div>
+  </div>
+
+<style>
+  .dash-modal { position: fixed; inset: 0; z-index: 1060; }
+  .dash-backdrop { position:absolute; inset:0; background:rgba(0,0,0,.45); }
+  .dash-dialog { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(1000px, 92vw); max-height:86vh; display:flex; flex-direction:column; background:#fff; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,.35); overflow:hidden; }
+  .dash-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; background:#0D47A1; color:#fff; }
+  .dash-close { background:none; border:none; color:#fff; font-size:18px; line-height:1; cursor:pointer; opacity:.9; }
+  .dash-close:hover { opacity:1; }
+  .dash-body { padding:14px; overflow:auto; background:#f8fafc; }
+  .dash-footer { padding:10px 14px; border-top:1px solid #e5e7eb; background:#fff; text-align:right; }
+  .dash-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:14px; }
+  .dash-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px; }
+  .dash-card-title { font-size:13px; font-weight:600; color:#374151; margin-bottom:8px; }
+  .dash-chart { height:260px; display:flex; align-items:center; justify-content:center; color:#6b7280; border:1px dashed #e5e7eb; border-radius:8px; background:#fff; position:relative; overflow:hidden; }
+  .dash-chart canvas { width:100% !important; height:100% !important; }
+  @media (max-width: 768px){ .dash-grid { grid-template-columns: 1fr; } .dash-dialog { width: 94vw; } }
+</style>
+
+<script>
+  (function(){
+    const openBtn = document.getElementById('open-dashboard');
+    const modal = document.getElementById('dashboard-modal');
+    let chartsBuilt = false;
+    function open(){
+      modal.style.display='block';
+      if(!chartsBuilt){ try { buildDashboardCharts(); chartsBuilt = true; } catch(e){ console.warn('Falha ao montar gráficos:', e); } }
+    }
+    function close(){ modal.style.display='none'; }
+    if(openBtn){ openBtn.addEventListener('click', open); }
+    modal?.addEventListener('click', function(e){ if(e.target && e.target.getAttribute('data-dash')==='close'){ close(); } });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape' && modal && modal.style.display==='block'){ close(); } });
+  })();
+  // Gráficos serão preenchidos após alinharmos quais você deseja ver.
+</script>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  function buildDashboardCharts(){
+    if(!(window.Chart)) return;
+    const container = document.querySelector('.recon-container');
+    const previsaoStr = container?.getAttribute('data-previsao') || '';
+  const previsao = parseBRDate(previsaoStr);
+
+    const rows = Array.from(document.querySelectorAll('[id^="prof-"] table tbody tr'));
+    if(!rows.length){
+      setPlaceholder('chart-convenios', 'Sem dados');
+      setPlaceholder('chart-procedimentos', 'Sem dados');
+      setPlaceholder('chart-profissionais', 'Sem dados');
+      setPlaceholder('chart-prazos', 'Sem dados');
+      return;
+    }
+
+  const byConvenio = new Map();
+  const byProc = new Map();
+  // Profissionais agrupados por id estável do header -> { name, total }
+  const byProf = new Map();
+  // Clientes
+  const byClienteLucro = new Map();
+  const byClienteCount = new Map();
+    let prazoBuckets = { lt45:0, b45_60:0, gt60:0 };
+
+    rows.forEach(tr => {
+      const tds = tr.querySelectorAll('td');
+      if(tds.length < 11) return;
+      const dataStr = (tds[1].textContent || '').trim();
+      const convenio = (tds[3].textContent || '').trim() || '(Sem convênio)';
+      const proc = (tds[6].textContent || '').trim() || '(Sem procedimento)';
+  const produzido = parseBRL((tds[8].textContent || '0')) || 0;
+  const imposto = parseBRL((tds[9].textContent || '0')) || 0;
+  const liquidoTxt = (tds[10].textContent || '').trim();
+  const liquidoVal = liquidoTxt ? parseBRL(liquidoTxt) : null;
+  const lucro = (typeof liquidoVal === 'number' && !isNaN(liquidoVal)) ? liquidoVal : (produzido - imposto);
+  let bruto = produzido;
+  if((!bruto || bruto === 0) && (typeof liquidoVal === 'number' && !isNaN(liquidoVal))){ bruto = liquidoVal + (imposto||0); }
+  const rawCliente = (tds[2].textContent || '').trim();
+  const cliente = rawCliente.replace(/\s+/g,' ').trim();
+
+      // Profissional (médico)
+  const table = tr.closest('table');
+  let profName = (table && table.getAttribute('data-prof-name')) ? table.getAttribute('data-prof-name').trim() : 'Médico';
+  let profId = (table && table.getAttribute('data-prof-id')) ? table.getAttribute('data-prof-id').trim() : '';
+  // Normalização leve de nome (fallback quando não houver id)
+  const profKey = profId || (profName ? profName.toLowerCase().replace(/\s+/g,' ').trim() : 'medico');
+
+      // Acumular
+  byConvenio.set(convenio, (byConvenio.get(convenio) || 0) + lucro);
+  byProc.set(proc, (byProc.get(proc) || 0) + lucro);
+  if(!byProf.has(profKey)) byProf.set(profKey, { name: profName, total: 0 });
+  const agg = byProf.get(profKey); agg.total += bruto; byProf.set(profKey, agg);
+  // Só acumula cliente quando o nome está presente (evita '(Sem cliente)')
+  if(cliente && cliente !== '-' && cliente !== '—'){
+    byClienteLucro.set(cliente, (byClienteLucro.get(cliente) || 0) + lucro);
+    byClienteCount.set(cliente, (byClienteCount.get(cliente) || 0) + 1);
+  }
+
+      // Buckets de prazo com base na cor já aplicada na tabela (fonte da verdade visual)
+      const dateSpan = tds[1].querySelector('.date-cell');
+      if(dateSpan){
+        if(dateSpan.classList.contains('text-danger')) prazoBuckets.gt60++;
+        else if(dateSpan.classList.contains('text-orange')) prazoBuckets.b45_60++;
+        else prazoBuckets.lt45++;
+      } else {
+        // Fallback: cálculo por datas (usa Previsão da tabela/médico; depois geral)
+        const tblPrevStr = table ? table.getAttribute('data-previsao') : '';
+        const prevDate = parseBRDate(tblPrevStr) || previsao;
+        if (prevDate instanceof Date && !isNaN(prevDate) && dataStr) {
+          const dItem = parseBRDate(dataStr);
+          if(dItem instanceof Date && !isNaN(dItem)){
+            const diffDays = Math.floor((prevDate - dItem) / (1000*60*60*24));
+            if(diffDays > 60) prazoBuckets.gt60++;
+            else if(diffDays >= 45 && diffDays <= 59) prazoBuckets.b45_60++;
+            else if(diffDays >= 0 && diffDays < 45) prazoBuckets.lt45++;
+          }
+        }
+      }
+    });
+
+    // Top 5 convenios e procedimentos
+    const topConvenios = topN(byConvenio, 5);
+    const topProcs = topN(byProc, 5);
+
+    // Render charts
+    renderBarChart('chart-convenios', 'Top convênios por lucro', topConvenios.labels, topConvenios.values);
+    renderBarChart('chart-procedimentos', 'Top procedimentos por lucro', topProcs.labels, topProcs.values);
+
+  // Profissionais: ordenar por valor desc
+  const profArr = Array.from(byProf.values()).sort((a,b)=>b.total - a.total);
+  renderPieChart('chart-profissionais', 'Distribuição por profissional (bruto)', profArr.map(x=>x.name), profArr.map(x=>round(x.total)));
+
+  // Clientes Top/Bottom por lucro
+  const tbLucro = topBottom6(byClienteLucro, true);
+  renderBarChart('chart-clientes-lucro', 'Clientes por lucro (Top 3 / Bottom 3)', tbLucro.labels, tbLucro.values, true, tbLucro.colors);
+
+  // Clientes Top/Bottom por quantidade de procedimentos
+  const tbCount = topBottom6(byClienteCount, false);
+  renderBarChartCounts('chart-clientes-proc', 'Clientes por quantidade (Top 3 / Bottom 3)', tbCount.labels, tbCount.values, true, tbCount.colors);
+
+  // Prazos (barras laterais)
+  const prazoLabels = ['Dentro do prazo (< 45 dias)', 'Entre 45 e 59 dias', 'Acima de 60 dias'];
+  const prazoValues = [prazoBuckets.lt45, prazoBuckets.b45_60, prazoBuckets.gt60];
+  renderBarChartCounts('chart-prazos', 'Pagamentos por faixa de prazo', prazoLabels, prazoValues, true, ['#10b981','#f59e0b','#ef4444']);
+  }
+
+  function parseBRL(txt){
+    if(!txt) return 0;
+    // Remove tudo exceto dígitos, vírgula e sinal
+    let s = (''+txt).replace(/[^0-9,\-\.]/g, '');
+    // Se houver pontos como milhar, remove-os; vírgula vira ponto decimal
+    s = s.replace(/\./g, '').replace(/,/g, '.');
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+  function parseBRDate(txt){
+    if(!txt) return null;
+    const m = (''+txt).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if(!m) return null;
+    const d = parseInt(m[1],10), mo = parseInt(m[2],10)-1, y = parseInt(m[3],10);
+    const fullY = y < 100 ? (2000 + y) : y;
+    const date = new Date(fullY, mo, d);
+    return isNaN(date) ? null : date;
+  }
+  function topN(map, n){
+    const arr = Array.from(map.entries()).sort((a,b)=>b[1]-a[1]).slice(0, n);
+    return { labels: arr.map(x=>x[0]), values: arr.map(x=>round(x[1])) };
+  }
+  function sortMap(map){
+    const arr = Array.from(map.entries()).sort((a,b)=>b[1]-a[1]);
+    return { labels: arr.map(x=>x[0]), values: arr.map(x=>round(x[1])) };
+  }
+  function round(v){ return Math.round((v + Number.EPSILON)*100)/100; }
+  function setPlaceholder(id, text){
+    const el = document.getElementById(id);
+    if(el){ el.textContent = text; }
+  }
+  function ensureCanvas(id){
+    const host = document.getElementById(id);
+    if(!host) return null;
+    host.innerHTML = '';
+    const c = document.createElement('canvas');
+    host.appendChild(c);
+    return c.getContext('2d');
+  }
+  function renderBarChart(id, title, labels, values, horizontal=false, colors=null){
+    const ctx = ensureCanvas(id); if(!ctx){ setPlaceholder(id, 'Sem dados'); return; }
+    if(!labels.length){ setPlaceholder(id, 'Sem dados'); return; }
+    const palette = (colors && colors.length===labels.length) ? colors : createColorPalette(labels.length);
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: title, data: values, backgroundColor: palette, borderColor: palette, borderWidth: 1, maxBarThickness: 42 }] },
+      options: {
+        indexAxis: horizontal ? 'y' : 'x',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, title: { display: false }, tooltip: { callbacks: { label: ctx => formatBRL(ctx.parsed[horizontal? 'x':'y']) } } },
+        scales: { x: { ticks: { autoSkip: true, maxTicksLimit: 6 } }, y: { beginAtZero: true } }
+      }
+    });
+  }
+  function renderDoughnutChart(id, title, labels, values){
+    const ctx = ensureCanvas(id); if(!ctx){ setPlaceholder(id, 'Sem dados'); return; }
+    const hasData = values.some(v=>v>0);
+    if(!hasData){ setPlaceholder(id, 'Sem dados'); return; }
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data: values, backgroundColor: ['#10b981','#f59e0b','#ef4444'] }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatBRL(ctx.parsed)}` } } } }
+    });
+  }
+  function renderBarChartCounts(id, title, labels, values, horizontal=false, colors){
+    const ctx = ensureCanvas(id); if(!ctx){ setPlaceholder(id, 'Sem dados'); return; }
+    if(!labels.length){ setPlaceholder(id, 'Sem dados'); return; }
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: title, data: values, backgroundColor: colors && colors.length===values.length ? colors : '#2563eb' }] },
+      options: {
+        indexAxis: horizontal ? 'y' : 'x',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, title: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed[horizontal? 'x':'y'] || 0} itens` } } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+  function renderPieChart(id, title, labels, values){
+    const ctx = ensureCanvas(id); if(!ctx){ setPlaceholder(id, 'Sem dados'); return; }
+    const hasData = values.some(v=>v>0);
+    if(!hasData){ setPlaceholder(id, 'Sem dados'); return; }
+    const colors = createColorPalette(values.length);
+    const total = values.reduce((a,b)=>a+b,0) || 1;
+    new Chart(ctx, {
+      type: 'pie',
+      data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins: { legend: { position: 'bottom', align: 'start', labels: { usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 14, boxHeight: 10, padding: 14 } }, tooltip: { callbacks: { label: ctx => {
+        const v = ctx.parsed || 0; const p = ((v/total)*100).toFixed(1).replace('.',','); return `${ctx.label}: ${formatBRL(v)} (${p}%)`;
+      } } } } }
+    });
+  }
+  function formatBRL(v){ try { return (typeof v==='number') ? v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' }) : String(v); } catch(e){ return String(v); } }
+  function createColorPalette(n){
+    const base = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6','#f97316','#eab308','#22c55e','#06b6d4'];
+    if(n <= base.length) return base.slice(0,n);
+    const out = [];
+    for(let i=0;i<n;i++){
+      out.push(`hsl(${Math.round((360/n)*i)}, 70%, 55%)`);
+    }
+    return out;
+  }
+  function topBottom6(map, isCurrency){
+    const arr = Array.from(map.entries());
+    if(!arr.length) return { labels: [], values: [], colors: [] };
+    const top = arr.slice().sort((a,b)=>b[1]-a[1]).slice(0,3);
+    const bottom = arr.slice().sort((a,b)=>a[1]-b[1]).slice(0,3);
+    const merged = [...top, ...bottom];
+    const labels = merged.map(x=>x[0]);
+    const values = merged.map(x=> isCurrency ? round(x[1]) : Math.round(x[1]));
+    const colors = merged.map((_,i)=> i<top.length ? '#10b981' : '#ef4444');
+    return { labels, values, colors };
+  }
+</script>
 {% endblock %}
+</script>

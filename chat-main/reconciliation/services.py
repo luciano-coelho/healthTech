@@ -84,11 +84,12 @@ def _find_date(text: str) -> str:
 monetary_re = re.compile(r"\b\d{1,3}(?:\.\d{3})*,\d{2}\b")
 
 
-def parse_line_fallback(text: str) -> dict[str, str | float | None]:
+def parse_line_fallback(text: str, *, excludes: Iterable[str] | None = None) -> dict[str, str | float | None]:
     """Best-effort extraction from a flat line: date, code, procedure, qty and amounts.
     Returns a possibly partial dict with keys among: data, codigo, procedimento, quantidade, valor_produzido, imposto, valor_liquido.
     """
     res: dict[str, str | float | None] = {}
+    excludes_set = { _norm(e) for e in (excludes or []) if _norm(e) }
     # date
     d = _find_date(text)
     if d:
@@ -104,7 +105,7 @@ def parse_line_fallback(text: str) -> dict[str, str | float | None]:
         mqty = re.search(r"(\d{1,3})(?:\s*)$", pre.strip())
         if mqty:
             res['quantidade'] = _ptbr_to_decimal(mqty.group(1))
-    # code: first token with any digit after date
+    # code: choose a token with digits after date, excluding atendimento/conta and obvious non-codes
     parts = text.split()
     code = ''
     if 'data' in res:
@@ -115,10 +116,37 @@ def parse_line_fallback(text: str) -> dict[str, str | float | None]:
     else:
         di = -1
     span = parts[di+1:] if di != -1 else parts
+
+    def looks_like_date(tok: str) -> bool:
+        return bool(DATE_DMY_RE.search(tok) or DATE_YMD_RE.search(tok))
+
+    def looks_like_money(tok: str) -> bool:
+        return bool(monetary_re.fullmatch(tok))
+
+    def is_quantity_like(tok: str) -> bool:
+        # quantities tend to be small integers or x,xx
+        t = tok.replace(',', '.').replace('\xa0', '').strip()
+        return bool(re.fullmatch(r"\d{1,2}(?:\.\d{1,2})?", t))
+
+    candidates: List[str] = []
     for tok in span:
-        if any(ch.isdigit() for ch in tok) and len(tok) <= 12:
-            code = tok
-            break
+        t = _norm(tok)
+        if not t:
+            continue
+        if t in excludes_set:
+            continue
+        if looks_like_date(t) or looks_like_money(t) or is_quantity_like(t):
+            continue
+        if any(ch.isdigit() for ch in t):
+            # Work with digits-only to avoid tokens like '2º' e afins
+            digits_only = ''.join(ch for ch in t if ch.isdigit())
+            if 5 <= len(digits_only) <= 12 and digits_only not in excludes_set:
+                candidates.append(digits_only)
+    # Prefer longer numeric-ish tokens (procedure codes) but cap at 12
+    candidates = [c for c in candidates if len(c) <= 12]
+    candidates.sort(key=lambda x: (-len(x)))
+    if candidates:
+        code = candidates[0]
     if code:
         res['codigo'] = code
     # procedimento: between code and last amount
@@ -390,7 +418,7 @@ def parse_items_from_tables(df: pd.DataFrame) -> list[ParsedItem]:
 
             # If still missing critical fields, try fallback from full text
             if not (data_dict.get('codigo') or data_dict.get('procedimento')):
-                fb = parse_line_fallback(row_text_all)
+                fb = parse_line_fallback(row_text_all, excludes=[data_dict.get('atendimento',''), data_dict.get('conta','')])
                 for k in ['data','codigo','procedimento']:
                     if k in fb and fb[k]:
                         data_dict[k] = fb[k]  # type: ignore
@@ -400,9 +428,41 @@ def parse_items_from_tables(df: pd.DataFrame) -> list[ParsedItem]:
                         data_dict[k] = fb[k]  # type: ignore
             # Even if we have procedimento, try to fill missing codigo from the line
             if not data_dict.get('codigo'):
-                fb2 = parse_line_fallback(row_text_all)
+                fb2 = parse_line_fallback(row_text_all, excludes=[data_dict.get('atendimento',''), data_dict.get('conta','')])
                 if 'codigo' in fb2 and fb2['codigo']:
                     data_dict['codigo'] = fb2['codigo']  # type: ignore
+            # If still missing, use table positions: look for a numeric-ish token between Data and Procedimento/Quantidade/Valores
+            if not data_dict.get('codigo'):
+                try:
+                    # find column indexes for landmarks
+                    idx_data = next((idx for idx, key in col_map.items() if key == 'data'), None)
+                    # prefer to stop at procedimento, otherwise at first of quantidade/valores
+                    stop_keys = {'procedimento', 'quantidade', 'valor_produzido', 'imposto', 'valor_liquido'}
+                    idx_stop = None
+                    for k in ['procedimento', 'quantidade', 'valor_produzido', 'imposto', 'valor_liquido']:
+                        idx_stop = next((idx for idx, key in col_map.items() if key == k), idx_stop)
+                        if idx_stop is not None:
+                            break
+                    start = (idx_data + 1) if idx_data is not None else 0
+                    end = idx_stop if idx_stop is not None else len(row_vals)
+                    candidates = []
+                    for c in row_vals[start:end]:
+                        t = _norm(c)
+                        if not t:
+                            continue
+                        # a code is typically a plain number (maybe with dots) with at least 5 digits overall
+                        digits = ''.join(ch for ch in t if ch.isdigit())
+                        if len(digits) >= 5 and len(digits) <= 12 and digits not in {data_dict.get('atendimento',''), data_dict.get('conta','')}:
+                            candidates.append(digits)
+                    if candidates:
+                        # choose the most digit-rich (and longer) candidate
+                        candidates.sort(key=lambda x: (-len(x)))
+                        data_dict['codigo'] = candidates[0]
+                except Exception:
+                    pass
+            # Guard: avoid equating codigo to atendimento/conta
+            if data_dict.get('codigo') and data_dict.get('codigo') in {data_dict.get('atendimento'), data_dict.get('conta')}:
+                data_dict['codigo'] = ''
 
             q = _ptbr_to_decimal(data_dict.get('quantidade'))
             vp = _ptbr_to_decimal(data_dict.get('valor_produzido'))
@@ -496,6 +556,12 @@ def parse_items_from_text(pdf_path: Path) -> list[ParsedItem]:
                     conta = m_ac.group(2)
                     # replace left with the remainder to avoid confusing code/procedure extraction
                     left = [m_ac.group(3)]
+                else:
+                    # Some layouts only have Atendimento leading the row
+                    m_a = re.match(r"\s*(\d{4,})\s+(.*)$", left_join)
+                    if m_a:
+                        atendimento = m_a.group(1)
+                        left = [m_a.group(2)]
                 # Try find date (robusto)
                 data = ''
                 for p in left:
@@ -510,10 +576,16 @@ def parse_items_from_text(pdf_path: Path) -> list[ParsedItem]:
 
                 # Try find code (token with any digit and short-ish)
                 codigo = ''
+                excludes = {atendimento, conta}
                 for p in left:
-                    if any(ch.isdigit() for ch in p) and len(p) <= 12:
-                        codigo = p
+                    t = _norm(p)
+                    if not t or t in excludes:
+                        continue
+                    if any(ch.isdigit() for ch in t) and len(t) <= 12:
+                        codigo = t
                         break
+                if codigo and codigo in excludes:
+                    codigo = ''
 
                 # Procedure: take the longest chunk
                 procedimento = max(left, key=len) if left else ''
@@ -629,6 +701,8 @@ def parse_items_from_words(pdf_path: Path) -> list[ParsedItem]:
             # parse data lines after header
             last_date = ''
             for line in lines[header_idx + 1:]:
+                # Keep full line text to enable robust fallbacks independent of column boundaries
+                full_line_text = ' '.join(_norm(w.get('text', '')) for w in line if _norm(w.get('text', '')))
                 texts_by_key: dict[str, List[str]] = {b[2]: [] for b in boundaries}
                 for w in line:
                     x = float(w.get('x0', 0.0))
@@ -649,14 +723,17 @@ def parse_items_from_words(pdf_path: Path) -> list[ParsedItem]:
                     break
                 # Try to extract date if missing
                 if not row.get('data'):
-                    d = _find_date(row_text_all)
+                    d = _find_date(full_line_text or row_text_all)
                     if d:
                         row['data'] = d
                 # Try to extract missing codigo from full line
                 if not row.get('codigo'):
-                    fb = parse_line_fallback(row_text_all)
+                    fb = parse_line_fallback(full_line_text or row_text_all, excludes=[row.get('atendimento',''), row.get('conta','')])
                     if 'codigo' in fb and fb['codigo']:
                         row['codigo'] = fb['codigo']  # type: ignore
+                # Guard: avoid codigo equal to atendimento/conta
+                if row.get('codigo') and row.get('codigo') in {row.get('atendimento'), row.get('conta')}:
+                    row['codigo'] = ''
                 # Fill down last seen date if still missing
                 if row.get('data'):
                     last_date = row['data']  # type: ignore
