@@ -47,6 +47,39 @@ def _ptbr_to_decimal(s: str | None) -> float | None:
         return None
 
 
+# ---- Date helpers ---------------------------------------------------------
+# Accepts variants like: 01/08/2025, 01/08/25, 01-08-2025, 01.08.2025, 01 / 08 / 2025
+# and also ISO-like 2025-08-01 (will be reformatted to dd/mm/yyyy)
+DATE_DMY_RE = re.compile(r"\b(\d{2})\s*[\/.\-]\s*(\d{2})(?:\s*[\/.\-]\s*(\d{2,4}))?\b")
+DATE_YMD_RE = re.compile(r"\b(\d{4})\s*[-/.]\s*(\d{2})\s*[-/.]\s*(\d{2})\b")
+
+
+def _normalize_date_str(day: str, month: str, year: str | None) -> str:
+    d = day.zfill(2)
+    m = month.zfill(2)
+    if year is None:
+        return f"{d}/{m}"
+    y = year
+    # Keep 2-digit year if provided, otherwise 4-digit
+    if len(y) == 2:
+        return f"{d}/{m}/{y}"
+    return f"{d}/{m}/{y.zfill(4)}"
+
+
+def _find_date(text: str) -> str:
+    """Find a date in text and return normalized BR format (dd/mm[/yy|yyyy])."""
+    if not text:
+        return ""
+    m = DATE_DMY_RE.search(text)
+    if m:
+        return _normalize_date_str(m.group(1), m.group(2), m.group(3))
+    m = DATE_YMD_RE.search(text)
+    if m:
+        # Convert yyyy-mm-dd -> dd/mm/yyyy
+        return f"{m.group(3).zfill(2)}/{m.group(2).zfill(2)}/{m.group(1)}"
+    return ""
+
+
 @dataclass
 class ParsedHeader:
     repasse_numero: str = ""
@@ -231,10 +264,10 @@ def parse_items_from_tables(df: pd.DataFrame) -> list[ParsedItem]:
         Retorna dict possivelmente parcial.
         """
         res: dict[str, str | float | None] = {}
-        # datas
-        m = re.search(r"\b(\d{2}/\d{2}(?:/\d{2,4})?)\b", text)
-        if m:
-            res['data'] = m.group(1)
+        # datas (robusto)
+        d = _find_date(text)
+        if d:
+            res['data'] = d
         # valores: pegar 3 últimos montantes como produzido, imposto, liquido
         amts = monetary_re.findall(text)
         if len(amts) >= 3:
@@ -339,9 +372,9 @@ def parse_items_from_tables(df: pd.DataFrame) -> list[ParsedItem]:
 
             # If no explicit 'data', try to extract by regex from the row text
             if not data_dict.get('data'):
-                m = re.search(r"\b(\d{2}/\d{2}(?:/\d{2,4})?)\b", row_text_all)
-                if m:
-                    data_dict['data'] = m.group(1)
+                d = _find_date(row_text_all)
+                if d:
+                    data_dict['data'] = d
 
             # If still missing critical fields, try fallback from full text
             if not (data_dict.get('codigo') or data_dict.get('procedimento')):
@@ -433,12 +466,11 @@ def parse_items_from_text(pdf_path: Path) -> list[ParsedItem]:
                 left = parts[:-4]
                 if not left:
                     continue
-                # Try find date
+                # Try find date (robusto)
                 data = ''
                 for p in left:
-                    m = date_re.search(p)
-                    if m:
-                        data = m.group(1)
+                    data = _find_date(p)
+                    if data:
                         break
 
                 # Try find code (token with any digit and short-ish)
@@ -578,9 +610,9 @@ def parse_items_from_words(pdf_path: Path) -> list[ParsedItem]:
                     break
                 # Try to extract date if missing
                 if not row.get('data'):
-                    m = re.search(r"\b(\d{2}/\d{2}(?:/\d{2,4})?)\b", row_text_all)
-                    if m:
-                        row['data'] = m.group(1)
+                    d = _find_date(row_text_all)
+                    if d:
+                        row['data'] = d
 
                 # Heuristic validity
                 has_code_or_proc = bool(row.get('codigo') or row.get('procedimento'))
@@ -617,7 +649,7 @@ def parse_items_from_words(pdf_path: Path) -> list[ParsedItem]:
     return items
 
 
-def import_hospital_pdf(pdf_path: str, file_field=None) -> list[RemittanceHeader]:
+def import_hospital_pdf(pdf_path: str, file_field=None) -> list:
     """Importa o PDF criando um RemittanceHeader por profissional detectado.
     Retorna a lista de headers criados.
     """
