@@ -80,6 +80,60 @@ def _find_date(text: str) -> str:
     return ""
 
 
+# Monetary amount regex (pt-BR) usable across parsers
+monetary_re = re.compile(r"\b\d{1,3}(?:\.\d{3})*,\d{2}\b")
+
+
+def parse_line_fallback(text: str) -> dict[str, str | float | None]:
+    """Best-effort extraction from a flat line: date, code, procedure, qty and amounts.
+    Returns a possibly partial dict with keys among: data, codigo, procedimento, quantidade, valor_produzido, imposto, valor_liquido.
+    """
+    res: dict[str, str | float | None] = {}
+    # date
+    d = _find_date(text)
+    if d:
+        res['data'] = d
+    # amounts: take the last three as produzido, imposto, liquido
+    amts = monetary_re.findall(text)
+    if len(amts) >= 3:
+        res['valor_produzido'] = _ptbr_to_decimal(amts[-3])
+        res['imposto'] = _ptbr_to_decimal(amts[-2])
+        res['valor_liquido'] = _ptbr_to_decimal(amts[-1])
+        # qty: token before produzido
+        pre = text.rsplit(amts[-3], 1)[0]
+        mqty = re.search(r"(\d{1,3})(?:\s*)$", pre.strip())
+        if mqty:
+            res['quantidade'] = _ptbr_to_decimal(mqty.group(1))
+    # code: first token with any digit after date
+    parts = text.split()
+    code = ''
+    if 'data' in res:
+        try:
+            di = parts.index(res['data'])
+        except ValueError:
+            di = -1
+    else:
+        di = -1
+    span = parts[di+1:] if di != -1 else parts
+    for tok in span:
+        if any(ch.isdigit() for ch in tok) and len(tok) <= 12:
+            code = tok
+            break
+    if code:
+        res['codigo'] = code
+    # procedimento: between code and last amount
+    if code and len(amts) >= 1:
+        rightmost = amts[-1]
+        try:
+            left = text.index(code) + len(code)
+            right = text.rfind(rightmost)
+            proc = _norm(text[left:right])
+            res['procedimento'] = proc
+        except ValueError:
+            pass
+    return res
+
+
 @dataclass
 class ParsedHeader:
     repasse_numero: str = ""
@@ -257,57 +311,7 @@ def parse_items_from_tables(df: pd.DataFrame) -> list[ParsedItem]:
         row_text_n = normalize_for_match(row_text)
         return any(w in row_text_n for w in ['resultado', 'resumo', 'total geral', 'totais', 'ass', 'assinatura', 'total ('])
 
-    monetary_re = re.compile(r"\b\d{1,3}(?:\.\d{3})*,\d{2}\b")
-
-    def parse_line_fallback(text: str) -> dict[str, str | float | None]:
-        """Tenta extrair campos básicos de uma linha sem colunas: data, codigo, procedimento, qtd, valores.
-        Retorna dict possivelmente parcial.
-        """
-        res: dict[str, str | float | None] = {}
-        # datas (robusto)
-        d = _find_date(text)
-        if d:
-            res['data'] = d
-        # valores: pegar 3 últimos montantes como produzido, imposto, liquido
-        amts = monetary_re.findall(text)
-        if len(amts) >= 3:
-            res['valor_produzido'] = _ptbr_to_decimal(amts[-3])
-            res['imposto'] = _ptbr_to_decimal(amts[-2])
-            res['valor_liquido'] = _ptbr_to_decimal(amts[-1])
-            # qtd: token anterior ao produzido
-            # aproximação: pegar substring antes do amts[-3] e usar último número simples
-            pre = text.rsplit(amts[-3], 1)[0]
-            mqty = re.search(r"(\d{1,3})(?:\s*)$", pre.strip())
-            if mqty:
-                res['quantidade'] = _ptbr_to_decimal(mqty.group(1))
-        # código: primeiro token de dígitos após data
-        parts = text.split()
-        code = ''
-        if 'data' in res:
-            try:
-                di = parts.index(res['data'])
-            except ValueError:
-                di = -1
-        else:
-            di = -1
-        span = parts[di+1:] if di != -1 else parts
-        for tok in span:
-            if any(ch.isdigit() for ch in tok) and len(tok) <= 12:
-                code = tok
-                break
-        if code:
-            res['codigo'] = code
-        # procedimento: trecho entre código e valores finais
-        if code and len(amts) >= 1:
-            rightmost = amts[-1]
-            try:
-                left = text.index(code) + len(code)
-                right = text.rfind(rightmost)
-                proc = _norm(text[left:right])
-                res['procedimento'] = proc
-            except ValueError:
-                pass
-        return res
+    # (parse_line_fallback now defined at module level)
 
     def score_header_row(values: list[str]) -> tuple[int, list[str]]:
         cols = [normalize_for_match(v) for v in values]
@@ -394,6 +398,11 @@ def parse_items_from_tables(df: pd.DataFrame) -> list[ParsedItem]:
                 for k in ['quantidade','valor_produzido','imposto','valor_liquido']:
                     if k in fb and fb[k] is not None and data_dict.get(k) in (None, '',):
                         data_dict[k] = fb[k]  # type: ignore
+            # Even if we have procedimento, try to fill missing codigo from the line
+            if not data_dict.get('codigo'):
+                fb2 = parse_line_fallback(row_text_all)
+                if 'codigo' in fb2 and fb2['codigo']:
+                    data_dict['codigo'] = fb2['codigo']  # type: ignore
 
             q = _ptbr_to_decimal(data_dict.get('quantidade'))
             vp = _ptbr_to_decimal(data_dict.get('valor_produzido'))
@@ -477,6 +486,16 @@ def parse_items_from_text(pdf_path: Path) -> list[ParsedItem]:
                 left = parts[:-4]
                 if not left:
                     continue
+                # Try to capture Atendimento and Conta from the beginning of the left segment
+                left_join = ' '.join(left)
+                atendimento = ''
+                conta = ''
+                m_ac = re.match(r"\s*(\d{4,})\s+(\d{4,})\s+(.*)$", left_join)
+                if m_ac:
+                    atendimento = m_ac.group(1)
+                    conta = m_ac.group(2)
+                    # replace left with the remainder to avoid confusing code/procedure extraction
+                    left = [m_ac.group(3)]
                 # Try find date (robusto)
                 data = ''
                 for p in left:
@@ -503,6 +522,8 @@ def parse_items_from_text(pdf_path: Path) -> list[ParsedItem]:
                     continue
 
                 items.append(ParsedItem(
+                    atendimento=atendimento,
+                    conta=conta,
                     data=data,
                     codigo=codigo,
                     procedimento=procedimento,
@@ -631,6 +652,11 @@ def parse_items_from_words(pdf_path: Path) -> list[ParsedItem]:
                     d = _find_date(row_text_all)
                     if d:
                         row['data'] = d
+                # Try to extract missing codigo from full line
+                if not row.get('codigo'):
+                    fb = parse_line_fallback(row_text_all)
+                    if 'codigo' in fb and fb['codigo']:
+                        row['codigo'] = fb['codigo']  # type: ignore
                 # Fill down last seen date if still missing
                 if row.get('data'):
                     last_date = row['data']  # type: ignore

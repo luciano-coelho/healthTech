@@ -445,6 +445,7 @@ def qa_remittance(request, id: int):
         return '' if v is None else str(v)
     rows = [
         "|".join([
+            it.atendimento or '',
             it.data or '',
             it.paciente or '',
             it.convenio or '',
@@ -457,7 +458,7 @@ def qa_remittance(request, id: int):
             fmt(it.valor_liquido if it.valor_liquido is not None else ((it.valor_produzido or zero) - (it.imposto or zero)))
         ]) for it in items
     ]
-    header_row = "Data|Paciente|Convênio|Categoria|Código|Procedimento|Qtd|Produzido|Imposto|Líquido"
+    header_row = "Atendimento|Data|Paciente|Convênio|Categoria|Código|Procedimento|Qtd|Produzido|Imposto|Líquido"
     table_text = "\n".join([header_row] + rows[:800])  # safety cap
 
     sys_preamble = (
@@ -524,7 +525,7 @@ def qa_consolidated(request):
 
     # Linhas detalhadas (capadas) – adiciona o profissional no início
     rows = []
-    header_row = "Profissional|Especialidade|Data|Paciente|Convênio|Categoria|Código|Procedimento|Qtd|Produzido|Imposto|Líquido"
+    header_row = "Profissional|Especialidade|Atendimento|Data|Paciente|Convênio|Categoria|Código|Procedimento|Qtd|Produzido|Imposto|Líquido"
 
     for h in headers:
         agg = h.items.aggregate(
@@ -550,6 +551,7 @@ def qa_consolidated(request):
             rows.append("|".join([
                 h.profissional_nome or '-',
                 h.especialidade or '-',
+                it.atendimento or '',
                 it.data or '',
                 it.paciente or '',
                 it.convenio or '',

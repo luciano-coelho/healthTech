@@ -221,6 +221,7 @@
         <table class="table table-sm table-striped">
           <thead>
             <tr>
+              <th>Atendimento</th>
               <th>Data</th>
               <th>Paciente</th>
               <th>Convênio</th>
@@ -236,6 +237,7 @@
           <tbody>
             {% for it in items %}
             <tr>
+              <td>{{ it.atendimento }}</td>
               <td>{{ it.data }}</td>
               <td>{{ it.paciente }}</td>
               <td>{{ it.convenio }}</td>
@@ -249,14 +251,14 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="10">Nenhum item importado.</td>
+              <td colspan="11">Nenhum item importado.</td>
             </tr>
             {% endfor %}
           </tbody>
           {% if summary.count %}
           <tfoot>
             <tr class="totals-row">
-              <th colspan="6" class="totals-label-master">Totais:</th>
+              <th colspan="7" class="totals-label-master">Totais:</th>
               <th class="tfoot-cell text-right">
                 <span class="tfoot-label">Qtd</span>
                 <span class="tfoot-value">{{ summary.total_qtd|floatformat:0 }}</span>
@@ -305,7 +307,7 @@
   tfoot .totals-row th:nth-child(5) { min-width: 140px; }
   .flex-break { flex-basis:100%; width:100%; height:0; }
   .diff-highlight { color:#F47C20 !important; }
-  .recon-container { max-width: 1215px !important; }
+  .recon-container { max-width: 1275px !important; }
   .section-divider { border-top:2px solid #e5e7eb; margin: 10px 0 16px; }
   /* Chat flutuante (mesma base do detalhe) */
   .qa-container { position: fixed; left: 20px; bottom: 20px; z-index: 1050; }
