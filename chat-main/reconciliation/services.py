@@ -345,6 +345,8 @@ def parse_items_from_tables(df: pd.DataFrame) -> list[ParsedItem]:
 
         # Advance to first data row after header
         i += 1
+        # Keep last seen date within this block to fill down missing dates
+        last_date: str = ""
         empty_rows = 0
         while i < max_rows:
             rr = df.iloc[i]
@@ -375,6 +377,12 @@ def parse_items_from_tables(df: pd.DataFrame) -> list[ParsedItem]:
                 d = _find_date(row_text_all)
                 if d:
                     data_dict['data'] = d
+
+            # Fill down last seen date if still missing
+            if data_dict.get('data'):
+                last_date = data_dict['data']  # type: ignore
+            elif last_date:
+                data_dict['data'] = last_date
 
             # If still missing critical fields, try fallback from full text
             if not (data_dict.get('codigo') or data_dict.get('procedimento')):
@@ -445,14 +453,17 @@ def parse_items_from_text(pdf_path: Path) -> list[ParsedItem]:
             text = page.extract_text() or ''
             lines = [l for l in text.splitlines() if l.strip()]
             seen_header = False
+            last_date = ''
             for line in lines:
                 ln = _strip_accents(line.lower())
                 if not seen_header and all(k in ln for k in ['paciente', 'convenio', 'procedimento']):
                     seen_header = True
+                    last_date = ''  # reset at new header
                     continue
                 if not seen_header:
                     continue
                 if looks_like_footer(line):
+                    last_date = ''  # end of block
                     break
                 parts = re.split(r"\s{2,}", line.strip())
                 if len(parts) < 6:
@@ -472,6 +483,11 @@ def parse_items_from_text(pdf_path: Path) -> list[ParsedItem]:
                     data = _find_date(p)
                     if data:
                         break
+                # Fill down last seen date if still missing
+                if data:
+                    last_date = data
+                elif last_date:
+                    data = last_date
 
                 # Try find code (token with any digit and short-ish)
                 codigo = ''
@@ -590,6 +606,7 @@ def parse_items_from_words(pdf_path: Path) -> list[ParsedItem]:
                 continue
 
             # parse data lines after header
+            last_date = ''
             for line in lines[header_idx + 1:]:
                 texts_by_key: dict[str, List[str]] = {b[2]: [] for b in boundaries}
                 for w in line:
@@ -607,12 +624,18 @@ def parse_items_from_words(pdf_path: Path) -> list[ParsedItem]:
                 # Footer detection
                 row_text_all = ' '.join(row.values())
                 if any(tok in norm_text(row_text_all) for tok in ['resultado', 'resumo', 'total geral', 'totais', 'assinatura']):
+                    last_date = ''
                     break
                 # Try to extract date if missing
                 if not row.get('data'):
                     d = _find_date(row_text_all)
                     if d:
                         row['data'] = d
+                # Fill down last seen date if still missing
+                if row.get('data'):
+                    last_date = row['data']  # type: ignore
+                elif last_date:
+                    row['data'] = last_date
 
                 # Heuristic validity
                 has_code_or_proc = bool(row.get('codigo') or row.get('procedimento'))
@@ -765,4 +788,92 @@ def parse_pdf(pdf_path: Path) -> tuple[ParsedHeader, list[ParsedItem]]:
             items = parse_items_from_words(pdf_path)
         if not items:
             items = parse_items_from_text(pdf_path)
+
+    # Enriquecer datas faltantes cruzando com parsers alternativos (words/text)
+    def sign_key(it: ParsedItem) -> tuple:
+        # Chave de match robusta sem depender de paciente: codigo (se houver), procedimento, qtd e valores
+        proc = (it.procedimento or '').strip()[:80].lower()
+        cod = (it.codigo or '').strip().lower()
+        def rf(x):
+            try:
+                return round(float(x), 2) if x is not None else None
+            except Exception:
+                return None
+        q = rf(it.quantidade)
+        vp = rf(it.valor_produzido)
+        imp = rf(it.imposto)
+        liq = rf(it.valor_liquido if it.valor_liquido is not None else ((it.valor_produzido or 0) - (it.imposto or 0)))
+        return (cod, proc, q, vp, imp, liq)
+
+    missing = [it for it in items if not (it.data or '').strip()]
+    if missing:
+        # tentar via words
+        try:
+            words_items = parse_items_from_words(pdf_path)
+        except Exception:
+            words_items = []
+        dates_by_sig: dict[tuple, str] = {}
+        for wi in words_items:
+            if wi.data:
+                dates_by_sig[sign_key(wi)] = wi.data
+        # fallback text
+        if not dates_by_sig:
+            try:
+                text_items = parse_items_from_text(pdf_path)
+            except Exception:
+                text_items = []
+            for ti in text_items:
+                if ti.data:
+                    dates_by_sig[sign_key(ti)] = ti.data
+
+        # preencher a partir de assinaturas
+        for it in items:
+            if not (it.data or '').strip():
+                d = dates_by_sig.get(sign_key(it))
+                if d:
+                    it.data = d
+    # Último reforço: buscar linha no texto da página usando trio monetário (produzido, imposto, líquido)
+    if any(not (it.data or '').strip() for it in items):
+        try:
+            with pdfplumber.open(str(pdf_path)) as pdf:
+                page_lines: dict[int, list[str]] = {}
+                for pi, page in enumerate(pdf.pages, start=1):
+                    tx = page.extract_text() or ''
+                    page_lines[pi] = [l for l in tx.splitlines() if l.strip()]
+
+            def fmt_ptbr(val: float | None) -> list[str]:
+                if val is None:
+                    return []
+                try:
+                    v = round(float(val), 2)
+                except Exception:
+                    return []
+                # '1234,50' e '1.234,50'
+                s = f"{v:,.2f}"  # '1,234.50'
+                s = s.replace(',', 'X').replace('.', ',').replace('X', '.')
+                no_thousand = s.replace('.', '') if '.' in s and s.count(',') == 1 else s
+                variants = {s}
+                variants.add(no_thousand)
+                return list(variants)
+
+            for it in items:
+                if (it.data or '').strip():
+                    continue
+                lines = page_lines.get(getattr(it, 'page', 0) or 0) or []
+                vp_vars = fmt_ptbr(it.valor_produzido)
+                imp_vars = fmt_ptbr(it.imposto)
+                liq_vars = fmt_ptbr(it.valor_liquido if it.valor_liquido is not None else ((it.valor_produzido or 0) - (it.imposto or 0)))
+                if not (vp_vars and imp_vars and liq_vars):
+                    continue
+                found_line = None
+                for ln in lines:
+                    if any(v in ln for v in vp_vars) and any(v in ln for v in imp_vars) and any(v in ln for v in liq_vars):
+                        found_line = ln
+                        break
+                if found_line:
+                    d = _find_date(found_line)
+                    if d:
+                        it.data = d
+        except Exception:
+            pass
     return header, items
