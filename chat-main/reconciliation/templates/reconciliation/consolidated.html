@@ -317,6 +317,7 @@
   .diff-highlight { color:#F47C20 !important; }
   .recon-container { max-width: 1275px !important; }
   .section-divider { border-top:2px solid #e5e7eb; margin: 10px 0 16px; }
+  
   /* Chat flutuante (mesma base do detalhe) */
   .qa-container { position: fixed; left: 20px; bottom: 20px; z-index: 1050; }
   .qa-fab { display:inline-flex; align-items:center; justify-content:center; width:60px; height:60px; padding:4px; background:#fff; border-radius:50%; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.2); position:relative; border:3px solid #0D47A1; }
@@ -578,8 +579,7 @@
 <!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-  function buildDashboardCharts(){
-    if(!(window.Chart)) return;
+    function buildReconSummary(s){
     const container = document.querySelector('.recon-container');
     const previsaoStr = container?.getAttribute('data-previsao') || '';
   const previsao = parseBRDate(previsaoStr);
@@ -587,10 +587,6 @@
     const rows = Array.from(document.querySelectorAll('[id^="prof-"] table tbody tr'));
     if(!rows.length){
       setPlaceholder('chart-convenios', 'Sem dados');
-      setPlaceholder('chart-procedimentos', 'Sem dados');
-      setPlaceholder('chart-profissionais', 'Sem dados');
-      setPlaceholder('chart-prazos', 'Sem dados');
-      return;
     }
 
   const byConvenio = new Map();
@@ -810,7 +806,11 @@
       <button type="button" class="dash-close" aria-label="Fechar" data-rec="close">✕</button>
     </div>
     <div class="dash-body">
-      <div id="reconcile-summary" class="mb-2 text-muted small">Carregando...</div>
+      <div id="reconcile-summary" class="mb-2">
+        <div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;">
+          <div class="text-muted small mb-0">Carregando...</div>
+        </div>
+      </div>
       <div class="d-flex align-items-center mb-2" style="gap:10px;">
         <div class="small text-muted mr-2">Filtros:</div>
         <label class="mb-0 small"><input type="checkbox" id="flt-diff" checked> Mostrar Diferenças</label>
@@ -848,6 +848,41 @@
     const modal = document.getElementById('reconcile-modal');
     const tbody = modal.querySelector('#reconcile-table tbody');
     const summary = document.getElementById('reconcile-summary');
+    function buildReconSummary(s){
+      const itens = s.total || 0;
+      const matched = s.matched || 0;
+      const diff = s.diff || 0;
+      const missing = s.missing || 0;
+      return `
+        <div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;">
+          <div class="d-flex justify-content-between flex-wrap" style="gap:24px">
+            <div>
+              <div class="text-muted small">Itens</div>
+              <div class="h5 mb-0 text-dark font-weight-bold">${itens}</div>
+            </div>
+            <div>
+              <div class="text-muted small">Conciliados</div>
+              <div class="h5 mb-0 text-dark font-weight-bold">${matched}</div>
+            </div>
+            <div>
+              <div class="text-muted small">Com diferença</div>
+              <div class="h5 mb-0 text-dark font-weight-bold">${diff}</div>
+            </div>
+            <div>
+              <div class="text-muted small">Diferença (R$)</div>
+              <div class="h5 mb-0 text-dark font-weight-bold">${fmt(s.diff_value_abs)}</div>
+            </div>
+            <div>
+              <div class="text-muted small">Sem preço</div>
+              <div class="h5 mb-0 text-dark font-weight-bold">${missing}</div>
+            </div>
+            <div>
+              <div class="text-muted small">Sem preço (R$ prod.)</div>
+              <div class="h5 mb-0 text-dark font-weight-bold">${fmt(s.missing_produced)}</div>
+            </div>
+          </div>
+        </div>`;
+    }
     // util helpers available in this scope
     const esc = (s)=> String(s||'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
     const fmt = (v)=>{ if(v===null||v===undefined||v==='') return ''; try{ const n=parseFloat(v); if(isNaN(n)) return String(v); return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }catch(e){ return String(v);} };
@@ -872,7 +907,7 @@
         // Load reconciliation
         const idsCsv = '{{ header_ids|join:"," }}';
         tbody.innerHTML = '<tr><td colspan="9">Carregando...</td></tr>';
-        summary.textContent = 'Carregando...';
+  summary.innerHTML = '<div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;"><div class="text-muted small mb-0">Carregando...</div></div>';
         try{
           const resp = await fetch('/reconciliation/consolidated/reconcile/', {
             method:'POST',
@@ -884,7 +919,7 @@
           if(!resp.ok){ throw new Error(data && data.error ? data.error : 'Falha na conciliação'); }
           // Summary
           const s = data.summary || {};
-          summary.textContent = `Catálogo: ${s.catalog || '-'} | Itens: ${s.total || 0} | Conciliados: ${s.matched || 0} | Com diferença: ${s.diff || 0} | Sem preço: ${s.missing || 0}`;
+          summary.innerHTML = buildReconSummary(s);
           // Rows
           const rows = data.rows || [];
           if(!rows.length){ tbody.innerHTML = '<tr><td colspan="9">Sem itens para conciliar.</td></tr>'; return; }
@@ -908,7 +943,7 @@
           applyFilters();
         }catch(err){
           tbody.innerHTML = `<tr><td colspan="9" class="text-danger">Falha ao conciliar: ${esc(err.message||err)}</td></tr>`;
-          summary.textContent = 'Falha ao conciliar.';
+          summary.innerHTML = '<div class="border rounded p-3" style="background:#fff; border-color:#e0e0e0;"><div class="text-danger small mb-0">Falha ao conciliar.</div></div>';
         }
       });
     }

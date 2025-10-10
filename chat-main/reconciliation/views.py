@@ -75,6 +75,8 @@ def reconcile_prices(request):
     matched = 0
     diff = 0
     missing = 0
+    diff_value_abs_total = Decimal('0.00')
+    missing_produced_total = Decimal('0.00')
     for h in headers:
         for it in h.items.all():
             total += 1
@@ -99,10 +101,14 @@ def reconcile_prices(request):
                 if diff_total.copy_abs() > Decimal('0.01'):
                     status = 'diferenca'
                     diff += 1
+                    diff_value_abs_total += diff_total.copy_abs()
                 else:
                     status = 'ok'
             else:
                 missing += 1
+                # acumula produzido dos itens sem preço
+                if produzido is not None:
+                    missing_produced_total += (produzido or zero)
 
             rows.append({
                 'atendimento': it.atendimento or '',
@@ -127,6 +133,8 @@ def reconcile_prices(request):
             'diff': diff,
             'missing': missing,
             'catalog': str(latest_catalog),
+            'diff_value_abs': str(diff_value_abs_total),
+            'missing_produced': str(missing_produced_total),
         },
         'rows': rows,
     })
