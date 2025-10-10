@@ -580,7 +580,107 @@
     modal?.addEventListener('click', function(e){ if(e.target && e.target.getAttribute('data-dash')==='close'){ close(); } });
     document.addEventListener('keydown', function(e){ if(e.key==='Escape' && modal && modal.style.display==='block'){ close(); } });
   })();
-  // Gráficos serão preenchidos após alinharmos quais você deseja ver.
+  // Função para montar os gráficos do dashboard
+  function buildDashboardCharts() {
+    const container = document.querySelector('.recon-container');
+    const previsaoStr = container?.getAttribute('data-previsao') || '';
+    const previsao = parseBRDate(previsaoStr);
+
+    const rows = Array.from(document.querySelectorAll('[id^="prof-"] table tbody tr'));
+    if(!rows.length){
+      setPlaceholder('chart-convenios', 'Sem dados');
+      setPlaceholder('chart-procedimentos', 'Sem dados');
+      setPlaceholder('chart-clientes-lucro', 'Sem dados');
+      setPlaceholder('chart-clientes-proc', 'Sem dados');
+      setPlaceholder('chart-profissionais', 'Sem dados');
+      setPlaceholder('chart-prazos', 'Sem dados');
+      return;
+    }
+
+    const byConvenio = new Map();
+    const byProc = new Map();
+    const byProf = new Map();
+    const byClienteLucro = new Map();
+    const byClienteCount = new Map();
+    let prazoBuckets = { lt45:0, b45_60:0, gt60:0 };
+
+    rows.forEach(tr => {
+      const tds = tr.querySelectorAll('td');
+      if(tds.length < 11) return;
+      const dataStr = (tds[1].textContent || '').trim();
+      const convenio = (tds[3].textContent || '').trim() || '(Sem convênio)';
+      const proc = (tds[6].textContent || '').trim() || '(Sem procedimento)';
+      const produzido = parseBRL((tds[8].textContent || '0')) || 0;
+      const imposto = parseBRL((tds[9].textContent || '0')) || 0;
+      const liquidoTxt = (tds[10].textContent || '').trim();
+      const liquidoVal = liquidoTxt ? parseBRL(liquidoTxt) : null;
+      const lucro = (typeof liquidoVal === 'number' && !isNaN(liquidoVal)) ? liquidoVal : (produzido - imposto);
+      let bruto = produzido;
+      if((!bruto || bruto === 0) && (typeof liquidoVal === 'number' && !isNaN(liquidoVal))){ bruto = liquidoVal + (imposto||0); }
+      const rawCliente = (tds[2].textContent || '').trim();
+      const cliente = rawCliente.replace(/\s+/g,' ').trim();
+
+      // Profissional (médico)
+      const table = tr.closest('table');
+      let profName = (table && table.getAttribute('data-prof-name')) ? table.getAttribute('data-prof-name').trim() : 'Médico';
+      let profId = (table && table.getAttribute('data-prof-id')) ? table.getAttribute('data-prof-id').trim() : '';
+      const profKey = profId || (profName ? profName.toLowerCase().replace(/\s+/g,' ').trim() : 'medico');
+
+      byConvenio.set(convenio, (byConvenio.get(convenio) || 0) + lucro);
+      byProc.set(proc, (byProc.get(proc) || 0) + lucro);
+      if(!byProf.has(profKey)) byProf.set(profKey, { name: profName, total: 0 });
+      const agg = byProf.get(profKey); agg.total += bruto; byProf.set(profKey, agg);
+      if(cliente && cliente !== '-' && cliente !== '—'){
+        byClienteLucro.set(cliente, (byClienteLucro.get(cliente) || 0) + lucro);
+        byClienteCount.set(cliente, (byClienteCount.get(cliente) || 0) + 1);
+      }
+
+      // Buckets de prazo
+      const dateSpan = tds[1].querySelector('.date-cell');
+      if(dateSpan){
+        if(dateSpan.classList.contains('text-danger')) prazoBuckets.gt60++;
+        else if(dateSpan.classList.contains('text-orange')) prazoBuckets.b45_60++;
+        else prazoBuckets.lt45++;
+      } else {
+        const tblPrevStr = table ? table.getAttribute('data-previsao') : '';
+        const prevDate = parseBRDate(tblPrevStr) || previsao;
+        if (prevDate instanceof Date && !isNaN(prevDate) && dataStr) {
+          const dItem = parseBRDate(dataStr);
+          if(dItem instanceof Date && !isNaN(dItem)){
+            const diffDays = Math.floor((prevDate - dItem) / (1000*60*60*24));
+            if(diffDays > 60) prazoBuckets.gt60++;
+            else if(diffDays >= 45 && diffDays <= 59) prazoBuckets.b45_60++;
+            else if(diffDays >= 0 && diffDays < 45) prazoBuckets.lt45++;
+          }
+        }
+      }
+    });
+
+    // Top 5 convenios e procedimentos
+    const topConvenios = topN(byConvenio, 5);
+    const topProcs = topN(byProc, 5);
+
+    // Render charts
+    renderBarChart('chart-convenios', 'Top convênios por lucro', topConvenios.labels, topConvenios.values);
+    renderBarChart('chart-procedimentos', 'Top procedimentos por lucro', topProcs.labels, topProcs.values);
+
+    // Profissionais: ordenar por valor desc
+    const profArr = Array.from(byProf.values()).sort((a,b)=>b.total - a.total);
+    renderPieChart('chart-profissionais', 'Distribuição por profissional (bruto)', profArr.map(x=>x.name), profArr.map(x=>round(x.total)));
+
+    // Clientes Top/Bottom por lucro
+    const tbLucro = topBottom6(byClienteLucro, true);
+    renderBarChart('chart-clientes-lucro', 'Clientes por lucro (Top 3 / Bottom 3)', tbLucro.labels, tbLucro.values, true, tbLucro.colors);
+
+    // Clientes Top/Bottom por quantidade de procedimentos
+    const tbCount = topBottom6(byClienteCount, false);
+    renderBarChartCounts('chart-clientes-proc', 'Clientes por quantidade (Top 3 / Bottom 3)', tbCount.labels, tbCount.values, true, tbCount.colors);
+
+    // Prazos (barras laterais)
+    const prazoLabels = ['Dentro do prazo (< 45 dias)', 'Entre 45 e 59 dias', 'Acima de 60 dias'];
+    const prazoValues = [prazoBuckets.lt45, prazoBuckets.b45_60, prazoBuckets.gt60];
+    renderBarChartCounts('chart-prazos', 'Pagamentos por faixa de prazo', prazoLabels, prazoValues, true, ['#10b981','#f59e0b','#ef4444']);
+  }
 </script>
 
 <!-- Chart.js CDN -->
