@@ -7,9 +7,15 @@
   <div class="d-flex align-items-center justify-content-between mb-1">
     <h5 class="mb-0">Demonstrativo: {{ repasse_numero }} - {{ competencia }}</h5>
     <div class="d-flex align-items-center" style="gap:8px;">
-      <a href="{% url 'upload_remittance' %}" class="btn btn-outline-secondary btn-sm">Voltar ao upload</a>
+      <a href="{% url 'upload_remittance' %}" class="btn btn-light btn-sm" title="Voltar ao upload" aria-label="Voltar ao upload">
+        <svg class="upload-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </a>
       <button type="button" class="btn btn-primary btn-sm" id="open-dashboard">Dashboard</button>
-      <button type="button" class="btn btn-outline-primary btn-sm" id="open-reconcile">Conciliar Preços</button>
+      <button type="button" class="btn btn-primary btn-sm" id="open-reconcile">Conciliar Preços</button>
     </div>
   </div>
   <p class="text-muted mb-3"><strong>Terceiro:</strong> {{ terceiro_nome }} | <strong>CNPJ:</strong> {{ cnpj }} | <strong>Previsão:</strong> {{ previsao_pagamento }}</p>
@@ -317,6 +323,7 @@
   .diff-highlight { color:#F47C20 !important; }
   .recon-container { max-width: 1275px !important; }
   .section-divider { border-top:2px solid #e5e7eb; margin: 10px 0 16px; }
+  .upload-icon { display:inline-block; width:18px; height:18px; vertical-align:-2px; }
   
   /* Chat flutuante (mesma base do detalhe) */
   .qa-container { position: fixed; left: 20px; bottom: 20px; z-index: 1050; }
