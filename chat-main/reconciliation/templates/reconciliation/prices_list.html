@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="container recon-container mt-4">
+  <div class="price-card">
+  <h3 class="mb-3">Tabela de Procedimentos (Catálogo de Preços)</h3>
+
+  <form method="get" class="price-filters">
+    <div class="row align-items-end">
+      <div class="col-lg-3 col-md-6 mb-2">
+      <label class="form-label">Convênio</label>
+      <input class="form-control" type="text" name="convenio" value="{{ filters.convenio }}" placeholder="Ex.: Unimed" />
+      </div>
+      <div class="col-lg-5 col-md-6 mb-2">
+      <label class="form-label">Hospital (nome ou CNPJ)</label>
+      <input class="form-control" type="text" name="hospital" value="{{ filters.hospital }}" placeholder="Ex.: SOS Cardio ou 12.345..." />
+      </div>
+      <div class="col-lg-2 col-md-6 mb-2">
+      <label class="form-label">Categoria</label>
+      <input class="form-control" type="text" name="categoria" value="{{ filters.categoria }}" placeholder="Ex.: Enfermaria" />
+      </div>
+      <div class="col-lg-2 col-md-6 mb-2">
+      <label class="form-label">Código</label>
+      <input class="form-control" type="text" name="codigo" value="{{ filters.codigo }}" placeholder="Ex.: 10101012" />
+      </div>
+    </div>
+
+    <div class="row mt-2 filters-actions">
+      <div class="col d-flex align-items-center">
+        <button class="btn btn-primary mr-2" type="submit">Filtrar</button>
+        <a class="btn btn-outline-secondary" href="{% url 'prices_list' %}">Limpar</a>
+      </div>
+      {% if request.user.is_superuser %}
+      <div class="col-auto">
+        <a class="btn btn-success" href="{% url 'price_create' %}"><i class="fa fa-plus"></i> Novo preço</a>
+      </div>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="table-responsive mt-3">
+    <table class="table align-middle price-table">
+      <thead class="thead-blue">
+        <tr>
+          <th class="col-code">Código</th>
+          <th class="col-desc">Procedimento</th>
+          <th class="col-convenio">Convênio</th>
+          <th class="col-hospital">Hospital</th>
+          <th class="col-categoria">Categoria</th>
+          <th class="col-money">Valor Ref.</th>
+          {% if request.user.is_superuser %}<th style="width: 130px;">Ações</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in page_obj.object_list %}
+          <tr>
+            <td><code>{{ p.codigo }}</code></td>
+            <td>{{ p.descricao }}</td>
+            <td>{{ p.convenio }}</td>
+            <td>{% if p.hospital_cnpj %}<span title="{{ p.hospital_cnpj }}">{{ p.hospital_nome|default:p.hospital_cnpj }}</span>{% else %}{{ p.hospital_nome }}{% endif %}</td>
+            <td>{{ p.categoria }}</td>
+            <td class="col-money">R$ {{ p.preco_referencia }}</td>
+            {% if request.user.is_superuser %}
+            <td>
+              <a class="btn btn-sm btn-outline-primary me-1" href="{% url 'price_update' p.id %}" title="Editar" aria-label="Editar"><i class="fa fa-pencil"></i></a>
+              <a class="btn btn-sm btn-outline-danger" href="{% url 'price_delete' p.id %}" title="Excluir" aria-label="Excluir"><i class="fa fa-trash"></i></a>
+            </td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          {% if request.user.is_superuser %}
+            <tr><td colspan="7" class="text-center text-muted">Nenhum preço encontrado.</td></tr>
+          {% else %}
+            <tr><td colspan="6" class="text-center text-muted">Nenhum preço encontrado.</td></tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <nav aria-label="Paginação">
+    <ul class="pagination">
+      {% if page_obj.has_previous %}
+  <li class="page-item"><a class="page-link" href="?page=1{% if filters.convenio %}&convenio={{ filters.convenio|urlencode }}{% endif %}{% if filters.hospital %}&hospital={{ filters.hospital|urlencode }}{% endif %}{% if filters.categoria %}&categoria={{ filters.categoria|urlencode }}{% endif %}{% if filters.codigo %}&codigo={{ filters.codigo|urlencode }}{% endif %}">&laquo; Primeira</a></li>
+  <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filters.convenio %}&convenio={{ filters.convenio|urlencode }}{% endif %}{% if filters.hospital %}&hospital={{ filters.hospital|urlencode }}{% endif %}{% if filters.categoria %}&categoria={{ filters.categoria|urlencode }}{% endif %}{% if filters.codigo %}&codigo={{ filters.codigo|urlencode }}{% endif %}">Anterior</a></li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">&laquo; Primeira</span></li>
+        <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+      {% endif %}
+
+      <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+
+      {% if page_obj.has_next %}
+  <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filters.convenio %}&convenio={{ filters.convenio|urlencode }}{% endif %}{% if filters.hospital %}&hospital={{ filters.hospital|urlencode }}{% endif %}{% if filters.categoria %}&categoria={{ filters.categoria|urlencode }}{% endif %}{% if filters.codigo %}&codigo={{ filters.codigo|urlencode }}{% endif %}">Próxima</a></li>
+  <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if filters.convenio %}&convenio={{ filters.convenio|urlencode }}{% endif %}{% if filters.hospital %}&hospital={{ filters.hospital|urlencode }}{% endif %}{% if filters.categoria %}&categoria={{ filters.categoria|urlencode }}{% endif %}{% if filters.codigo %}&codigo={{ filters.codigo|urlencode }}{% endif %}">Última &raquo;</a></li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">Próxima</span></li>
+        <li class="page-item disabled"><span class="page-link">Última &raquo;</span></li>
+      {% endif %}
+    </ul>
+  </nav>
+
+  <p class="text-muted">Dica: use filtros de "Convênio" e "Categoria" para ver variações por plano e acomodação; busque pelo hospital por nome ou CNPJ.</p>
+  </div> <!-- /price-card -->
+  </div>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+</div>
+{% endblock %}

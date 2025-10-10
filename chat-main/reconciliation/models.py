@@ -66,6 +66,8 @@ class ProcedurePrice(models.Model):
     descricao = models.CharField(max_length=512, blank=True)
 
     convenio = models.CharField(max_length=128, blank=True)
+    hospital_cnpj = models.CharField(max_length=32, blank=True, help_text="CNPJ normalizado (somente dígitos)")
+    hospital_nome = models.CharField(max_length=256, blank=True)
     categoria = models.CharField(max_length=64, blank=True)
     funcao = models.CharField(max_length=128, blank=True)
 
@@ -78,13 +80,15 @@ class ProcedurePrice(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["codigo", "convenio"]),
-            models.Index(fields=["catalog", "codigo", "convenio"]),
+            models.Index(fields=["codigo", "convenio", "hospital_cnpj", "categoria"]),
+            models.Index(fields=["catalog", "codigo", "convenio", "hospital_cnpj", "categoria"]),
         ]
         unique_together = (
-            ("catalog", "codigo", "convenio", "vigencia_inicio", "vigencia_fim"),
+            ("catalog", "codigo", "convenio", "hospital_cnpj", "categoria", "vigencia_inicio", "vigencia_fim"),
         )
 
     def __str__(self) -> str:
         conv = f"/{self.convenio}" if self.convenio else ""
-        return f"{self.codigo}{conv} - {self.descricao[:50]}"
+        hosp = f" @{self.hospital_cnpj}" if self.hospital_cnpj else ""
+        cat = f" [{self.categoria}]" if self.categoria else ""
+        return f"{self.codigo}{conv}{cat}{hosp} - {self.descricao[:50]}"

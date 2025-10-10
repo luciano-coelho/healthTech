@@ -48,14 +48,17 @@
   <a href="{% url 'chat_view' %}"><img class="logo" src="{% static 'img/logo-larissa.PNG' %}" alt="" /></a>
     </div>
     <div class="menu-items">
-  {% if request.user.is_superuser %}
-  <a class="menu-link-primary" href="{% url 'list-users' %}">Usuários</a>
-  {% endif %}
-  <a class="menu-link-primary" href="{% url 'logout' %}">Sair</a>
+    <a class="menu-link-primary" href="{% url 'extrato_redirect' %}">Extrato</a>
+    {% if request.user.is_superuser %}
+    <a class="menu-link-primary" href="{% url 'prices_list' %}">Catálogo de Preços</a>
+    <a class="menu-link-primary" href="{% url 'list-users' %}">Usuários</a>
+    {% endif %}
+    <a class="menu-link-primary" href="{% url 'logout' %}">Sair</a>
     </div>
   </div>
 
   {% block main %}{% endblock %}
+
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>

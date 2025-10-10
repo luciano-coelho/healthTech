@@ -999,12 +999,18 @@ def reconcile_item_with_catalog(rem_item, *, catalog=None, tolerance_abs: float 
 
     code = _norm_code(getattr(rem_item, 'codigo', ''))
     convenio = (getattr(rem_item, 'convenio', '') or '') if use_convenio else ''
+    hospital_cnpj = ''.join(ch for ch in str(getattr(getattr(rem_item, 'header', None), 'cnpj', '')).strip() if ch.isdigit())
+    categoria = getattr(rem_item, 'categoria', '') or ''
     qty = float(getattr(rem_item, 'quantidade', 1) or 1)
     paid = float(getattr(rem_item, 'valor_produzido', 0) or 0)
 
     price_qs = ProcedurePrice.objects.filter(codigo=code)
     if use_convenio:
         price_qs = price_qs.filter(convenio=convenio)
+    if hospital_cnpj:
+        price_qs = price_qs.filter(hospital_cnpj=hospital_cnpj)
+    if categoria:
+        price_qs = price_qs.filter(categoria=categoria)
     if catalog is not None:
         if isinstance(catalog, PriceCatalog):
             price_qs = price_qs.filter(catalog=catalog)

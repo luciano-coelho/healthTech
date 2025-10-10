@@ -99,8 +99,12 @@
   <div class="mb-3">
     <div class="small text-muted mb-2">Ir para:</div>
     <div>
-      {% for entry in entries %}
-        <a class="btn btn-sm btn-outline-primary mr-1 mb-1" href="#prof-{{ entry.header.id }}">{{ entry.header.profissional_nome }}</a>
+      {% regroup entries by header.profissional_nome as prof_list %}
+      {% for prof in prof_list %}
+        {# Pega o primeiro entry para o id #}
+        {% with entry=prof.list.0 %}
+          <a class="btn btn-sm btn-outline-primary mr-1 mb-1" href="#prof-{{ entry.header.id }}">{{ prof.grouper }}</a>
+        {% endwith %}
       {% endfor %}
     </div>
     <div class="mt-2">

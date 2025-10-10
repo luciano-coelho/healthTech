@@ -1,3 +1,4 @@
+from django.utils.http import urlencode
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.http import JsonResponse
@@ -6,8 +7,222 @@ from pathlib import Path
 from decimal import Decimal
 from django.db.models import Sum
 
-from .forms import RemittanceUploadForm
-from .models import RemittanceHeader
+from .forms import RemittanceUploadForm, ProcedurePriceForm
+from .models import RemittanceHeader, ProcedurePrice, PriceCatalog
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.contrib import messages
+from django.db import transaction
+from .services import import_hospital_pdf, parse_pdf
+from chatbot.views import call_gemini_api
+
+def consolidated_dashboard(request):
+    """Render the consolidated dashboard for given RemittanceHeader IDs (from query param 'ids')."""
+    ids_csv = request.GET.get('ids', '').strip()
+    if not ids_csv:
+        # fallback: show upload page
+        from django.shortcuts import redirect
+        return redirect('upload_remittance')
+    try:
+        ids = [int(x) for x in ids_csv.split(',') if x.strip()]
+    except ValueError:
+        from django.shortcuts import redirect
+        return redirect('upload_remittance')
+    if not ids:
+        from django.shortcuts import redirect
+        return redirect('upload_remittance')
+    headers = list(RemittanceHeader.objects.filter(id__in=ids).prefetch_related('items').order_by('id'))
+    if not headers:
+        from django.shortcuts import redirect
+        return redirect('upload_remittance')
+    # Replicate context from upload_remittance (consolidated render)
+    entries = []
+    zero = Decimal('0.00')
+    for h in headers:
+        items_qs = h.items.all()
+        agg = items_qs.aggregate(
+            total_qtd=Sum('quantidade'),
+            total_bruto=Sum('valor_produzido'),
+            total_imposto=Sum('imposto'),
+            total_liquido=Sum('valor_liquido'),
+        )
+        total_bruto = agg['total_bruto'] or zero
+        total_imposto = agg['total_imposto'] or zero
+        total_liquido_informado = agg['total_liquido'] or zero
+        liquido_calculado = (total_bruto or zero) - (total_imposto or zero)
+        diferenca = total_liquido_informado - liquido_calculado
+        taxa_media_impostos = (total_imposto / total_bruto * Decimal('100')) if total_bruto and total_bruto != zero else None
+        percent_diferenca = (diferenca / liquido_calculado * Decimal('100')) if liquido_calculado and liquido_calculado != zero else None
+        from collections import defaultdict
+        profit_by_proc: dict[str, Decimal] = defaultdict(lambda: zero)
+        profit_by_conv: dict[str, Decimal] = defaultdict(lambda: zero)
+        tax_by_conv: dict[str, Decimal] = defaultdict(lambda: zero)
+        for it in items_qs:
+            vp = it.valor_produzido or zero
+            imp = it.imposto or zero
+            liq = it.valor_liquido if it.valor_liquido is not None else (vp - imp)
+            profit_by_proc[it.procedimento or '(sem procedimento)'] += (liq or zero)
+            conv = it.convenio or '(sem convênio)'
+            profit_by_conv[conv] += (liq or zero)
+            tax_by_conv[conv] += (imp or zero)
+        top_proc_name, top_proc_value = (None, zero)
+        if profit_by_proc:
+            top_proc_name, top_proc_value = max(profit_by_proc.items(), key=lambda kv: kv[1])
+        top_conv_name, top_conv_value = (None, zero)
+        if profit_by_conv:
+            top_conv_name, top_conv_value = max(profit_by_conv.items(), key=lambda kv: kv[1])
+        alerts = []
+        tolerance = Decimal('0.10')
+        for conv, lucro in profit_by_conv.items():
+            imp = tax_by_conv.get(conv, zero)
+            if imp == zero and lucro == zero:
+                continue
+            if lucro < imp:
+                alerts.append({
+                    'tipo': 'lucro_menor_que_imposto',
+                    'convenio': conv,
+                    'lucro': lucro,
+                    'imposto': imp,
+                    'diferenca': lucro - imp,
+                    'percent': ((lucro - imp) / imp * Decimal('100')) if imp != zero else None,
+                })
+            else:
+                diff = abs(lucro - imp)
+                if imp != zero and (diff <= (imp * tolerance)):
+                    signed_diff = lucro - imp
+                    alerts.append({
+                        'tipo': 'lucro_quase_igual_imposto',
+                        'convenio': conv,
+                        'lucro': lucro,
+                        'imposto': imp,
+                        'diferenca': signed_diff,
+                        'percent': (signed_diff / imp * Decimal('100')) if imp != zero else None,
+                    })
+        worst_conv_name, worst_conv_pct = None, None
+        worst_conv_lucro, worst_conv_imposto = zero, zero
+        percents = []
+        for conv, lucro in profit_by_conv.items():
+            imp = tax_by_conv.get(conv, zero)
+            if lucro == zero:
+                continue
+            pct = (imp / lucro * Decimal('100')) if lucro != zero else None
+            if pct is not None:
+                percents.append((conv, pct, lucro, imp))
+        if percents:
+            worst_conv_name, worst_conv_pct, worst_conv_lucro, worst_conv_imposto = max(percents, key=lambda x: x[1])
+        summary = {
+            'count': items_qs.count(),
+            'total_qtd': agg['total_qtd'] or zero,
+            'bruto': total_bruto,
+            'impostos': total_imposto,
+            'liquido_calculado': liquido_calculado,
+            'liquido_informado': total_liquido_informado,
+            'diferenca': diferenca,
+            'taxa_media_impostos': taxa_media_impostos,
+            'percent_diferenca': percent_diferenca,
+            'top_procedimento_nome': top_proc_name,
+            'top_procedimento_valor': top_proc_value,
+            'top_convenio_nome': top_conv_name,
+            'top_convenio_valor': top_conv_value,
+            'alerts': alerts,
+            'worst_convenio_nome': worst_conv_name,
+            'worst_convenio_percent': worst_conv_pct,
+            'worst_convenio_lucro': worst_conv_lucro,
+            'worst_convenio_imposto': worst_conv_imposto,
+        }
+        entries.append({'header': h, 'summary': summary, 'items': items_qs})
+    # Consolidado geral
+    total_count = 0
+    total_qtd = Decimal('0')
+    total_bruto_all = zero
+    total_imposto_all = zero
+    total_liquido_info_all = zero
+    from collections import defaultdict
+    profit_by_proc_all: dict[str, Decimal] = defaultdict(lambda: zero)
+    profit_by_conv_all: dict[str, Decimal] = defaultdict(lambda: zero)
+    tax_by_conv_all: dict[str, Decimal] = defaultdict(lambda: zero)
+    for e in entries:
+        for it in e['items']:
+            total_count += 1
+            total_qtd += (it.quantidade or Decimal('0'))
+            vp = it.valor_produzido or zero
+            imp = it.imposto or zero
+            total_bruto_all += vp
+            total_imposto_all += imp
+            liq_info = it.valor_liquido
+            if liq_info is not None:
+                total_liquido_info_all += liq_info
+            liq = liq_info if liq_info is not None else (vp - imp)
+            proc = it.procedimento or '(sem procedimento)'
+            conv = it.convenio or '(sem convênio)'
+            profit_by_proc_all[proc] += (liq or zero)
+            profit_by_conv_all[conv] += (liq or zero)
+            tax_by_conv_all[conv] += (imp or zero)
+    liquido_calc_all = total_bruto_all - total_imposto_all
+    diferenca_all = total_liquido_info_all - liquido_calc_all
+    taxa_media_imp_all = (total_imposto_all / total_bruto_all * Decimal('100')) if total_bruto_all and total_bruto_all != zero else None
+    percent_dif_all = (diferenca_all / liquido_calc_all * Decimal('100')) if liquido_calc_all and liquido_calc_all != zero else None
+    top_proc_name, top_proc_value = (None, zero)
+    if profit_by_proc_all:
+        top_proc_name, top_proc_value = max(profit_by_proc_all.items(), key=lambda kv: kv[1])
+    top_conv_name, top_conv_value = (None, zero)
+    if profit_by_conv_all:
+        top_conv_name, top_conv_value = max(profit_by_conv_all.items(), key=lambda kv: kv[1])
+    worst_conv_name, worst_conv_pct = None, None
+    worst_conv_lucro, worst_conv_imposto = zero, zero
+    percents = []
+    for conv, lucro in profit_by_conv_all.items():
+        imp = tax_by_conv_all.get(conv, zero)
+        if lucro == zero:
+            continue
+        pct = (imp / lucro * Decimal('100')) if lucro != zero else None
+        if pct is not None:
+            percents.append((conv, pct, lucro, imp))
+    if percents:
+        worst_conv_name, worst_conv_pct, worst_conv_lucro, worst_conv_imposto = max(percents, key=lambda x: x[1])
+    summary_all = {
+        'count': total_count,
+        'total_qtd': total_qtd,
+        'bruto': total_bruto_all,
+        'impostos': total_imposto_all,
+        'liquido_calculado': liquido_calc_all,
+        'liquido_informado': total_liquido_info_all,
+        'diferenca': diferenca_all,
+        'taxa_media_impostos': taxa_media_imp_all,
+        'percent_diferenca': percent_dif_all,
+        'top_procedimento_nome': top_proc_name,
+        'top_procedimento_valor': top_proc_value,
+        'top_convenio_nome': top_conv_name,
+        'top_convenio_valor': top_conv_value,
+        'worst_convenio_nome': worst_conv_name,
+        'worst_convenio_percent': worst_conv_pct,
+        'worst_convenio_lucro': worst_conv_lucro,
+        'worst_convenio_imposto': worst_conv_imposto,
+    }
+    # Use first header for repasse_numero, terceiro_nome, competencia, cnpj, previsao_pagamento
+    h0 = headers[0]
+    return render(request, 'reconciliation/consolidated.html', {
+        'entries': entries,
+        'summary_all': summary_all,
+        'repasse_numero': h0.repasse_numero,
+        'terceiro_nome': h0.terceiro_nome,
+        'competencia': h0.competencia,
+        'cnpj': h0.cnpj,
+        'previsao_pagamento': h0.previsao_pagamento,
+        'header_ids': [h.id for h in headers],
+    })
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
+from django.http import JsonResponse
+from django.urls import reverse
+from pathlib import Path
+from decimal import Decimal
+from django.db.models import Sum
+
+from .forms import RemittanceUploadForm, ProcedurePriceForm
+from .models import RemittanceHeader, ProcedurePrice, PriceCatalog
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.contrib import messages
 from django.db import transaction
 from .services import import_hospital_pdf, parse_pdf
@@ -594,3 +809,101 @@ def qa_consolidated(request):
 
     ai_text = call_gemini_api(prompt) or "Não consegui responder agora. Tente reformular a pergunta."
     return JsonResponse({'answer': ai_text})
+
+
+@login_required
+def list_prices(request):
+    """Listagem dos preços do catálogo com filtros e paginação."""
+    qs = ProcedurePrice.objects.select_related('catalog').all().order_by('codigo', 'convenio', 'categoria', 'hospital_nome')
+
+    # Filtros
+    catalog_id = request.GET.get('catalog')
+    convenio = (request.GET.get('convenio') or '').strip()
+    hospital = (request.GET.get('hospital') or '').strip()
+    categoria = (request.GET.get('categoria') or '').strip()
+    codigo = (request.GET.get('codigo') or '').strip()
+
+    if catalog_id:
+        qs = qs.filter(catalog_id=catalog_id)
+    else:
+        # Default to latest catalog if none selected
+        latest = PriceCatalog.objects.order_by('-id').first()
+        if latest:
+            catalog_id = str(latest.id)
+            qs = qs.filter(catalog=latest)
+    if convenio:
+        qs = qs.filter(convenio__icontains=convenio)
+    if hospital:
+        # buscar por nome ou CNPJ
+        qs = qs.filter(Q(hospital_nome__icontains=hospital) | Q(hospital_cnpj__icontains=''.join(ch for ch in hospital if ch.isdigit())))
+    if categoria:
+        qs = qs.filter(categoria__icontains=categoria)
+    if codigo:
+        # normalizar para dígitos, mas também permitir busca parcial
+        digits = ''.join(ch for ch in codigo if ch.isdigit())
+        if digits:
+            qs = qs.filter(codigo__icontains=digits)
+        else:
+            qs = qs.filter(codigo_original__icontains=codigo)
+
+    # Paginação
+    page_number = request.GET.get('page') or 1
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'filters': {
+            'convenio': convenio,
+            'hospital': hospital,
+            'categoria': categoria,
+            'codigo': codigo,
+        }
+    }
+    return render(request, 'reconciliation/prices_list.html', context)
+
+
+@login_required
+def price_create(request):
+    if not request.user.is_superuser:
+        messages.error(request, 'Permissão negada.')
+        return redirect('prices_list')
+    if request.method == 'POST':
+        form = ProcedurePriceForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Preço criado com sucesso.')
+            return redirect('prices_list')
+    else:
+        form = ProcedurePriceForm()
+    return render(request, 'reconciliation/price_form.html', {'form': form, 'title': 'Novo preço'})
+
+
+@login_required
+def price_update(request, id: int):
+    if not request.user.is_superuser:
+        messages.error(request, 'Permissão negada.')
+        return redirect('prices_list')
+    obj = ProcedurePrice.objects.get(id=id)
+    if request.method == 'POST':
+        form = ProcedurePriceForm(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Preço atualizado com sucesso.')
+            return redirect('prices_list')
+    else:
+        form = ProcedurePriceForm(instance=obj)
+    return render(request, 'reconciliation/price_form.html', {'form': form, 'title': f'Editar preço #{obj.id}'})
+
+
+@login_required
+def price_delete(request, id: int):
+    if not request.user.is_superuser:
+        messages.error(request, 'Permissão negada.')
+        return redirect('prices_list')
+    obj = ProcedurePrice.objects.get(id=id)
+    if request.method == 'POST':
+        obj.delete()
+        messages.success(request, 'Preço excluído com sucesso.')
+        return redirect('prices_list')
+    return render(request, 'reconciliation/price_confirm_delete.html', {'obj': obj})

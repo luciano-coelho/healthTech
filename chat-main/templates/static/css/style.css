@@ -20,6 +20,70 @@ body {
     flex-direction: column;
     min-height: 100vh;
 }
+    /* === Prices table layout (match screenshot style) === */
+    .price-table {
+        border-collapse: separate;
+        border-spacing: 0 8px; /* soft row separation */
+    }
+    .price-table thead th {
+        background-color: #0b3c88 !important; /* deep blue */
+        color: #fff !important;
+        border-bottom: 3px solid #0B3C85 !important;
+        font-weight: 700;
+        text-transform: none;
+        padding: 12px 10px;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+    /* Force header blue when wrapped with .thead-blue (higher specificity) */
+    .price-table thead.thead-blue th,
+    .table thead.thead-blue th {
+        background: #0D47A1 !important;
+        color: #fff !important;
+        border-bottom-color: #0B3C85 !important;
+    }
+    .price-table tbody tr { background: #f6f6f6; }
+    .price-table tbody tr:nth-child(even) {
+        background: #ededed;
+    }
+    .price-table td {
+        padding: 10px;
+        vertical-align: middle;
+    }
+    .price-table .col-code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        letter-spacing: 0.3px;
+        color: #e91e63; /* highlight like screenshot */
+    }
+    .price-table .col-money {
+        text-align: right;
+        white-space: nowrap;
+    }
+    .price-table .col-catalog,
+    .price-table .col-desc { max-width: 420px; }
+    .price-table .col-hospital { max-width: 260px; }
+    .price-table .col-categoria { width: 120px; }
+    .price-table .col-convenio { width: 160px; }
+
+    .price-filters .form-label { font-weight: 600; }
+    .price-filters .btn { min-width: 110px; }
+    .price-filters .inline-note { font-size: 0.9rem; color: #666; }
+
+    /* Card container similar to detail page blocks */
+    .price-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 6px 18px rgba(0,0,0,.06);
+        padding: 16px 18px;
+    }
+    .price-card h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 12px; }
+    .price-filters .form-control, .price-filters .form-select { height: 38px; padding: 6px 10px; }
+    .price-filters .btn { height: 38px; padding: 6px 12px; }
+    .price-filters label.form-label { font-size: 0.9rem; color: #333; margin-bottom: 4px; }
+    .filters-actions { border-top: 1px dashed #e5e7eb; padding-top: 8px; margin-top: 8px; }
+    .price-table th, .price-table td { padding: 10px; }
 
 /* Menu Superior */
 .menu {
@@ -612,23 +676,13 @@ table tr:hover {
 /* #######AJUDA######## */
 
 
- .help-icon-container {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-}
+/* Floating avatar removed from base; keep container style minimal if reused elsewhere */
+.help-icon-container { display: none; }
 
-.help-icon-container img {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    border: 2px solid var(--color-primary);
-    object-fit: cover;
-    padding: 0;
-}
+/* Precise ring with inner white gap */
+/* Avatar ring styles removed */
+.help-avatar { display: none; }
+.help-avatar img{ display: none; }
 
 
 @keyframes blink {
@@ -644,34 +698,8 @@ table tr:hover {
     animation: blink 0.5s ease-in-out alternate 6;
 }
 
-.help-message {
-    margin-left: 10px;
-    background-color: #333;
-    color: #fff;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    display: none;
-    position: absolute;
-    left: 70px;
-    bottom: 20px;
-    white-space: nowrap;
-}
-
-.help-icon-container:hover .help-message {
-    display: block;
-}
-
-.help-message::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: -8px;
-    transform: translateY(-50%);
-    border-width: 6px;
-    border-style: solid;
-    border-color: transparent #333 transparent transparent;
-}
+/* Remove bubble for clean avatar-only look */
+.help-message { display:none !important; }
 
 
 #myModal {
@@ -742,3 +770,6 @@ table tr:hover {
     margin-bottom: 10px;
     border-radius: 0 0 5px 5px;
 } 
+
+/* Recon: make the Tabela de Procedimentos section 10% wider than default container */
+.recon-container { max-width: 1150px !important; }
