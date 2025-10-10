@@ -980,3 +980,60 @@ def parse_pdf(pdf_path: Path) -> tuple[ParsedHeader, list[ParsedItem]]:
         except Exception:
             pass
     return header, items
+
+
+# ---------------------- Reconciliation helper ----------------------
+def _norm_code(s: str | None) -> str:
+    if not s:
+        return ""
+    t = str(s)
+    digits = ''.join(ch for ch in t if ch.isdigit())
+    return digits or t.strip()
+
+
+def reconcile_item_with_catalog(rem_item, *, catalog=None, tolerance_abs: float = 0.01, use_convenio: bool = True) -> dict:
+    """Compare a RemittanceItem with latest matching ProcedurePrice.
+    Returns dict with: has_price, expected, paid, diff, diff_pct, ok, price_id, catalog_id.
+    """
+    from .models import ProcedurePrice, PriceCatalog
+
+    code = _norm_code(getattr(rem_item, 'codigo', ''))
+    convenio = (getattr(rem_item, 'convenio', '') or '') if use_convenio else ''
+    qty = float(getattr(rem_item, 'quantidade', 1) or 1)
+    paid = float(getattr(rem_item, 'valor_produzido', 0) or 0)
+
+    price_qs = ProcedurePrice.objects.filter(codigo=code)
+    if use_convenio:
+        price_qs = price_qs.filter(convenio=convenio)
+    if catalog is not None:
+        if isinstance(catalog, PriceCatalog):
+            price_qs = price_qs.filter(catalog=catalog)
+        else:
+            price_qs = price_qs.filter(catalog_id=catalog)
+    # simples: usa o mais recente criado
+    price = price_qs.order_by('-id').first()
+    if not price:
+        return {
+            'has_price': False,
+            'expected': None,
+            'paid': paid,
+            'diff': None,
+            'diff_pct': None,
+            'ok': False,
+            'price_id': None,
+            'catalog_id': getattr(catalog, 'id', catalog),
+        }
+    expected = float(price.preco_referencia) * qty
+    diff = paid - expected
+    ok = abs(diff) <= tolerance_abs
+    diff_pct = (diff / expected) if expected else None
+    return {
+        'has_price': True,
+        'expected': expected,
+        'paid': paid,
+        'diff': diff,
+        'diff_pct': diff_pct,
+        'ok': ok,
+        'price_id': price.id,
+        'catalog_id': price.catalog_id,
+    }

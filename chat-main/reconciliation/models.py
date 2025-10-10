@@ -39,3 +39,52 @@ class RemittanceItem(models.Model):
 
     def __str__(self) -> str:
         return f"{self.data} {self.paciente} {self.codigo} {self.procedimento}"
+
+
+# -------------------- Price catalog for reconciliation --------------------
+class PriceCatalog(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    name = models.CharField(max_length=128)
+    version = models.CharField(max_length=64, blank=True)
+    competencia = models.CharField(max_length=32, blank=True)
+    source_file = models.CharField(max_length=256, blank=True)
+    notes = models.TextField(blank=True)
+
+    def __str__(self) -> str:
+        ver = f" - {self.version}" if self.version else ""
+        comp = f" ({self.competencia})" if self.competencia else ""
+        return f"{self.name}{ver}{comp}"
+
+
+class ProcedurePrice(models.Model):
+    catalog = models.ForeignKey(PriceCatalog, on_delete=models.CASCADE, related_name='prices')
+    # Código normalizado (somente dígitos), e o texto original para referência
+    codigo = models.CharField(max_length=32, db_index=True)
+    codigo_original = models.CharField(max_length=64, blank=True)
+    descricao = models.CharField(max_length=512, blank=True)
+
+    convenio = models.CharField(max_length=128, blank=True)
+    categoria = models.CharField(max_length=64, blank=True)
+    funcao = models.CharField(max_length=128, blank=True)
+
+    preco_referencia = models.DecimalField(max_digits=12, decimal_places=2)
+    vigencia_inicio = models.DateField(null=True, blank=True)
+    vigencia_fim = models.DateField(null=True, blank=True)
+    ativo = models.BooleanField(default=True)
+
+    metadata = models.JSONField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["codigo", "convenio"]),
+            models.Index(fields=["catalog", "codigo", "convenio"]),
+        ]
+        unique_together = (
+            ("catalog", "codigo", "convenio", "vigencia_inicio", "vigencia_fim"),
+        )
+
+    def __str__(self) -> str:
+        conv = f"/{self.convenio}" if self.convenio else ""
+        return f"{self.codigo}{conv} - {self.descricao[:50]}"
