@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load reconciliation_extras %}
 
 {% block main %}
 <div class="container recon-container mt-4">
@@ -59,7 +60,7 @@
             <td>{{ p.convenio }}</td>
             <td>{% if p.hospital_cnpj %}<span title="{{ p.hospital_cnpj }}">{{ p.hospital_nome|default:p.hospital_cnpj }}</span>{% else %}{{ p.hospital_nome }}{% endif %}</td>
             <td>{{ p.categoria }}</td>
-            <td class="col-money">R$ {{ p.preco_referencia }}</td>
+            <td class="col-money">{{ p.preco_referencia|brl }}</td>
             {% if request.user.is_superuser %}
             <td>
               <a class="btn btn-sm btn-outline-primary me-1" href="{% url 'price_update' p.id %}" title="Editar" aria-label="Editar"><i class="fa fa-pencil"></i></a>
