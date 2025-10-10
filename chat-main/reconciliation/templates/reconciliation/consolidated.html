@@ -9,6 +9,7 @@
     <div class="d-flex align-items-center" style="gap:8px;">
       <a href="{% url 'upload_remittance' %}" class="btn btn-outline-secondary btn-sm">Voltar ao upload</a>
       <button type="button" class="btn btn-primary btn-sm" id="open-dashboard">Dashboard</button>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="open-reconcile">Conciliar Preços</button>
     </div>
   </div>
   <p class="text-muted mb-3"><strong>Terceiro:</strong> {{ terceiro_nome }} | <strong>CNPJ:</strong> {{ cnpj }} | <strong>Previsão:</strong> {{ previsao_pagamento }}</p>
@@ -417,6 +418,18 @@
 
 <script>
 (function(){
+  // CSRF helper shared by AJAX calls on this page
+  function getCSRFCookie(name){
+    name = name || 'csrftoken';
+    const cookies = document.cookie ? document.cookie.split(';') : [];
+    for (let i = 0; i < cookies.length; i++){
+      const c = cookies[i].trim();
+      if (c.substring(0, name.length + 1) === (name + '=')){
+        return decodeURIComponent(c.substring(name.length + 1));
+      }
+    }
+    return '';
+  }
   const idsCsv = '{{ header_ids|join:"," }}';
   const ids = idsCsv ? idsCsv.split(',').map(function(s){ return parseInt(s, 10); }) : [];
   const fab = document.getElementById('qa-fab');
@@ -467,7 +480,11 @@
     const id = 'ld_'+Date.now(); msgs.insertAdjacentHTML('beforeend', '<div id="'+id+'" class="qa-row"><div class="qa-bubble">Pensando...</div></div>');
     scrollBottom();
     try{
-      const resp = await fetch("{% url 'qa_consolidated' %}", { method:'POST', headers:{ 'X-CSRFToken':'{{ csrf_token }}' }, body:new URLSearchParams({ q, ids: idsCsv }) });
+      const resp = await fetch("{% url 'qa_consolidated' %}", {
+        method:'POST',
+        headers:{ 'X-CSRFToken': getCSRFCookie() },
+        body:new URLSearchParams({ q, ids: idsCsv })
+      });
       const data = await resp.json();
       document.getElementById(id)?.remove();
       const text = (data && data.answer) ? data.answer : 'Não consegui responder agora.';
@@ -783,5 +800,138 @@
     return { labels, values, colors };
   }
 </script>
-{% endblock %}
+
+<!-- Reconcile Modal -->
+<div id="reconcile-modal" class="dash-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="reconcile-title" style="display:none;">
+  <div class="dash-backdrop" data-rec="close"></div>
+  <div class="dash-dialog" role="document" style="width:min(1100px, 95vw);">
+    <div class="dash-header">
+      <h5 id="reconcile-title" class="mb-0">Conciliação de Preços</h5>
+      <button type="button" class="dash-close" aria-label="Fechar" data-rec="close">✕</button>
+    </div>
+    <div class="dash-body">
+      <div id="reconcile-summary" class="mb-2 text-muted small">Carregando...</div>
+      <div class="d-flex align-items-center mb-2" style="gap:10px;">
+        <div class="small text-muted mr-2">Filtros:</div>
+        <label class="mb-0 small"><input type="checkbox" id="flt-diff" checked> Mostrar Diferenças</label>
+        <label class="mb-0 small"><input type="checkbox" id="flt-missing" checked> Mostrar Sem Preço</label>
+        <label class="mb-0 small"><input type="checkbox" id="flt-ok" checked> Mostrar OK</label>
+      </div>
+      <div class="table-responsive" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;">
+        <table class="table table-sm table-striped" id="reconcile-table">
+          <thead>
+            <tr>
+              <th>Convênio</th>
+              <th>Código</th>
+              <th>Categoria</th>
+              <th class="text-right">Qtd</th>
+              <th class="text-right">Produzido</th>
+              <th class="text-right">Ref (unit.)</th>
+              <th class="text-right">Ref (total)</th>
+              <th class="text-right">Diferença</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="9">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="dash-footer">
+      <button type="button" class="btn btn-light" data-rec="close">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    const openBtn = document.getElementById('open-reconcile');
+    const modal = document.getElementById('reconcile-modal');
+    const tbody = modal.querySelector('#reconcile-table tbody');
+    const summary = document.getElementById('reconcile-summary');
+    // util helpers available in this scope
+    const esc = (s)=> String(s||'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const fmt = (v)=>{ if(v===null||v===undefined||v==='') return ''; try{ const n=parseFloat(v); if(isNaN(n)) return String(v); return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }catch(e){ return String(v);} };
+    function getCSRFCookie(name){
+      name = name || 'csrftoken';
+      const cookies = document.cookie ? document.cookie.split(';') : [];
+      for (let i = 0; i < cookies.length; i++){
+        const c = cookies[i].trim();
+        if (c.substring(0, name.length + 1) === (name + '=')){
+          return decodeURIComponent(c.substring(name.length + 1));
+        }
+      }
+      return '';
+    }
+    function open(){ modal.style.display='block'; }
+    function close(){ modal.style.display='none'; }
+    modal?.addEventListener('click', function(e){ if(e.target && e.target.getAttribute('data-rec')==='close'){ close(); } });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape' && modal && modal.style.display==='block'){ close(); } });
+    if(openBtn){
+      openBtn.addEventListener('click', async function(){
+        open();
+        // Load reconciliation
+        const idsCsv = '{{ header_ids|join:"," }}';
+        tbody.innerHTML = '<tr><td colspan="9">Carregando...</td></tr>';
+        summary.textContent = 'Carregando...';
+        try{
+          const resp = await fetch('/reconciliation/consolidated/reconcile/', {
+            method:'POST',
+            headers:{ 'X-CSRFToken': getCSRFCookie() },
+            body: new URLSearchParams({ ids: idsCsv })
+          });
+          // Try to parse JSON even on error to surface server error message
+          const data = await resp.json();
+          if(!resp.ok){ throw new Error(data && data.error ? data.error : 'Falha na conciliação'); }
+          // Summary
+          const s = data.summary || {};
+          summary.textContent = `Catálogo: ${s.catalog || '-'} | Itens: ${s.total || 0} | Conciliados: ${s.matched || 0} | Com diferença: ${s.diff || 0} | Sem preço: ${s.missing || 0}`;
+          // Rows
+          const rows = data.rows || [];
+          if(!rows.length){ tbody.innerHTML = '<tr><td colspan="9">Sem itens para conciliar.</td></tr>'; return; }
+          const trHtml = rows.map(r=>{
+            const cls = r.status==='ok' ? 'table-success' : (r.status==='diferenca' ? 'table-warning' : 'table-light');
+            const codeCell = (r.price_id ? `<a href="/reconciliation/prices/${r.price_id}/edit/" target="_blank" title="Editar preço em nova aba">${esc(r.codigo)}</a>` : esc(r.codigo));
+            return `<tr class="${cls}" data-status="${r.status}">
+              <td>${esc(r.convenio)}</td>
+              <td>${codeCell}</td>
+              <td>${esc(r.categoria)}</td>
+              <td class="text-right">${esc(r.qtd)}</td>
+              <td class="text-right">${fmt(r.produzido)}</td>
+              <td class="text-right">${fmt(r.ref_unit)}</td>
+              <td class="text-right">${fmt(r.ref_total)}</td>
+              <td class="text-right">${fmt(r.diff_total)}</td>
+              <td>${r.status==='ok' ? 'OK' : (r.status==='diferenca' ? 'Diferença' : 'Sem preço')}</td>
+            </tr>`;
+          }).join('');
+          tbody.innerHTML = trHtml;
+          // apply filters on initial render
+          applyFilters();
+        }catch(err){
+          tbody.innerHTML = `<tr><td colspan="9" class="text-danger">Falha ao conciliar: ${esc(err.message||err)}</td></tr>`;
+          summary.textContent = 'Falha ao conciliar.';
+        }
+      });
+    }
+
+    // Filter logic
+    function applyFilters(){
+      const showDiff = document.getElementById('flt-diff').checked;
+      const showMissing = document.getElementById('flt-missing').checked;
+      const showOk = document.getElementById('flt-ok').checked;
+      tbody.querySelectorAll('tr').forEach(tr=>{
+        const st = tr.getAttribute('data-status');
+        if(!st){ tr.style.display=''; return; }
+        let visible = false;
+        if(st === 'diferenca' && showDiff) visible = true;
+        if(st === 'sem-preco' && showMissing) visible = true;
+        if(st === 'ok' && showOk) visible = true;
+        tr.style.display = visible ? '' : 'none';
+      });
+    }
+    ['flt-diff','flt-missing','flt-ok'].forEach(id=>{
+      const el = document.getElementById(id);
+      el?.addEventListener('change', applyFilters);
+    });
+  })();
 </script>
+{% endblock %}

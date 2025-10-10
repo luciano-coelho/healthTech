@@ -16,6 +16,120 @@ from django.db import transaction
 from .services import import_hospital_pdf, parse_pdf
 from chatbot.views import call_gemini_api
 
+def _norm_digits(s: str) -> str:
+    return ''.join(ch for ch in str(s or '') if ch.isdigit())
+
+def _norm_text(s: str) -> str:
+    return ' '.join(str(s or '').strip().split()).lower()
+
+def _norm_categoria(s: str) -> str:
+    txt = (s or '').strip().upper()
+    if 'ENF' in txt:
+        return 'Enfermaria'
+    if 'APT' in txt:
+        return 'Apartamento'
+    # Title-case default to improve matching
+    return (s or '').strip()
+
+@login_required
+def reconcile_prices(request):
+    """Reconcile remittance items with latest price catalog by (codigo, convenio, categoria).
+
+    Expects POST with ids: comma-separated RemittanceHeader IDs.
+    Returns JSON with rows and summary.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    ids_csv = request.POST.get('ids', '').strip()
+    if not ids_csv:
+        return JsonResponse({'error': 'IDs ausentes'}, status=400)
+    try:
+        ids = [int(x) for x in ids_csv.split(',') if x.strip()]
+    except ValueError:
+        return JsonResponse({'error': 'IDs inválidos'}, status=400)
+    headers = list(RemittanceHeader.objects.filter(id__in=ids).prefetch_related('items'))
+    if not headers:
+        return JsonResponse({'error': 'Nenhum demonstrativo encontrado'}, status=404)
+
+    latest_catalog = PriceCatalog.objects.order_by('-id').first()
+    if not latest_catalog:
+        return JsonResponse({'error': 'Catálogo de preços não encontrado'}, status=404)
+
+    # Build price lookup dictionary: key = (codigo_digits, convenio_norm, categoria_norm)
+    price_map = {}
+    for pr in ProcedurePrice.objects.filter(catalog=latest_catalog).only('id', 'codigo', 'convenio', 'categoria', 'preco_referencia'):
+        key = (_norm_digits(pr.codigo), _norm_text(pr.convenio), _norm_categoria(pr.categoria))
+        # store tuple (price_id, ref_value); keep the lowest reference price if duplicates
+        current = price_map.get(key)
+        if current is None:
+            price_map[key] = (pr.id, pr.preco_referencia)
+        else:
+            _, curr_ref = current
+            if pr.preco_referencia is not None and (curr_ref is None or pr.preco_referencia < curr_ref):
+                price_map[key] = (pr.id, pr.preco_referencia)
+
+    rows = []
+    zero = Decimal('0.00')
+    total = 0
+    matched = 0
+    diff = 0
+    missing = 0
+    for h in headers:
+        for it in h.items.all():
+            total += 1
+            codigo = _norm_digits(it.codigo)
+            convenio = _norm_text(it.convenio)
+            categoria = _norm_categoria(it.categoria)
+            qty = it.quantidade or Decimal('1')
+            produzido = it.valor_produzido or zero
+            ref_entry = price_map.get((codigo, convenio, categoria))
+            price_id = None
+            ref = None
+            if ref_entry is not None:
+                price_id, ref = ref_entry
+            status = 'sem-preco'
+            ref_total = None
+            diff_total = None
+            if ref is not None:
+                matched += 1
+                ref_total = (ref or zero) * (qty or Decimal('1'))
+                diff_total = (produzido or zero) - ref_total
+                # Consider diferença relevante quando valor absoluto > 0.01
+                if diff_total.copy_abs() > Decimal('0.01'):
+                    status = 'diferenca'
+                    diff += 1
+                else:
+                    status = 'ok'
+            else:
+                missing += 1
+
+            rows.append({
+                'atendimento': it.atendimento or '',
+                'data': it.data or '',
+                'paciente': it.paciente or '',
+                'convenio': it.convenio or '',
+                'categoria': categoria or (it.categoria or ''),
+                'codigo': it.codigo or '',
+                'qtd': str(qty) if qty is not None else '',
+                'produzido': str(produzido or zero),
+                'price_id': price_id,
+                'ref_unit': str(ref) if ref is not None else None,
+                'ref_total': str(ref_total) if ref_total is not None else None,
+                'diff_total': str(diff_total) if diff_total is not None else None,
+                'status': status,
+            })
+
+    return JsonResponse({
+        'summary': {
+            'total': total,
+            'matched': matched,
+            'diff': diff,
+            'missing': missing,
+            'catalog': str(latest_catalog),
+        },
+        'rows': rows,
+    })
 def consolidated_dashboard(request):
     """Render the consolidated dashboard for given RemittanceHeader IDs (from query param 'ids')."""
     ids_csv = request.GET.get('ids', '').strip()

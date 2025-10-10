@@ -12,6 +12,7 @@ urlpatterns = [
     path('detail/<int:id>/reprocess/', views.reprocess_remittance, name='reprocess_remittance'),
     path('detail/<int:id>/qa/', views.qa_remittance, name='qa_remittance'),
     path('consolidated/qa/', views.qa_consolidated, name='qa_consolidated'),
+    path('consolidated/reconcile/', views.reconcile_prices, name='reconcile_prices'),
     path('prices/', views.list_prices, name='prices_list'),
     path('prices/new/', views.price_create, name='price_create'),
     path('prices/<int:id>/edit/', views.price_update, name='price_update'),
