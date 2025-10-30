@@ -7,7 +7,7 @@ from pathlib import Path
 from decimal import Decimal
 from django.db.models import Sum
 
-from .forms import RemittanceUploadForm, ProcedurePriceForm
+from .forms import RemittanceUploadForm, ProcedurePriceForm, AdvancedSearchForm
 from .models import RemittanceHeader, ProcedurePrice, PriceCatalog
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -300,27 +300,27 @@ def consolidated_dashboard(request):
         pct = (imp / lucro * Decimal('100')) if lucro != zero else None
         if pct is not None:
             percents.append((conv, pct, lucro, imp))
-    if percents:
-        worst_conv_name, worst_conv_pct, worst_conv_lucro, worst_conv_imposto = max(percents, key=lambda x: x[1])
-    summary_all = {
-        'count': total_count,
-        'total_qtd': total_qtd,
-        'bruto': total_bruto_all,
-        'impostos': total_imposto_all,
-        'liquido_calculado': liquido_calc_all,
-        'liquido_informado': total_liquido_info_all,
-        'diferenca': diferenca_all,
-        'taxa_media_impostos': taxa_media_imp_all,
-        'percent_diferenca': percent_dif_all,
-        'top_procedimento_nome': top_proc_name,
-        'top_procedimento_valor': top_proc_value,
-        'top_convenio_nome': top_conv_name,
-        'top_convenio_valor': top_conv_value,
-        'worst_convenio_nome': worst_conv_name,
-        'worst_convenio_percent': worst_conv_pct,
-        'worst_convenio_lucro': worst_conv_lucro,
-        'worst_convenio_imposto': worst_conv_imposto,
-    }
+        if percents:
+            worst_conv_name, worst_conv_pct, worst_conv_lucro, worst_conv_imposto = max(percents, key=lambda x: x[1])
+        summary_all = {
+            'count': total_count,
+            'total_qtd': total_qtd,
+            'bruto': total_bruto_all,
+            'impostos': total_imposto_all,
+            'liquido_calculado': liquido_calc_all,
+            'liquido_informado': total_liquido_info_all,
+            'diferenca': diferenca_all,
+            'taxa_media_impostos': taxa_media_imp_all,
+            'percent_diferenca': percent_dif_all,
+            'top_procedimento_nome': top_proc_name,
+            'top_procedimento_valor': top_proc_value,
+            'top_convenio_nome': top_conv_name,
+            'top_convenio_valor': top_conv_value,
+            'worst_convenio_nome': worst_conv_name,
+            'worst_convenio_percent': worst_conv_pct,
+            'worst_convenio_lucro': worst_conv_lucro,
+            'worst_convenio_imposto': worst_conv_imposto,
+        }
     # Use first header for repasse_numero, terceiro_nome, competencia, cnpj, previsao_pagamento
     h0 = headers[0]
     return render(request, 'reconciliation/consolidated.html', {
@@ -370,6 +370,26 @@ def upload_remittance(request):
                     tmp_path = tmp.name
                     created_temp = True
             try:
+                # Primeiro, extrair o header para verificar o número de repasse
+                from .services import parse_pdf
+                pdfp = Path(tmp_path)
+                header, _ = parse_pdf(pdfp)
+                
+                # Validar se o número de repasse já existe no sistema
+                if header.repasse_numero:
+                    existing_header = RemittanceHeader.objects.filter(
+                        repasse_numero=header.repasse_numero
+                    ).first()
+                    
+                    if existing_header:
+                        messages.error(
+                            request, 
+                            f'O número de repasse "{header.repasse_numero}" já foi registrado no sistema. '
+                            f'Dados já cadastrados em {existing_header.created_at.strftime("%d/%m/%Y às %H:%M")}.'
+                        )
+                        return redirect('upload_remittance')
+                
+                # Se não existe duplicação, proceder com a importação
                 hdrs = import_hospital_pdf(tmp_path, file_field=f)
                 # Se vários headers, informar na UI
                 if not hdrs:
@@ -1029,3 +1049,242 @@ def price_delete(request, id: int):
         messages.success(request, 'Preço excluído com sucesso.')
         return redirect('prices_list')
     return render(request, 'reconciliation/price_confirm_delete.html', {'obj': obj})
+
+
+@login_required
+def advanced_search(request):
+    """Pesquisa avançada com múltiplos filtros nos dados de remessa."""
+    form = AdvancedSearchForm(request.GET or None)
+    
+    # Verificar se há filtros aplicados
+    has_search = bool(request.GET and any(request.GET.values()))
+    
+    if not has_search:
+        # Sem pesquisa - só mostrar o formulário
+        context = {
+            'form': form,
+            'entries': [],
+            'summary_all': None,
+            'total_results': 0,
+            'applied_filters': {},
+            'has_search': False,
+        }
+        return render(request, 'reconciliation/advanced_search.html', context)
+    
+    # Inicializar queryset
+    qs = RemittanceHeader.objects.all()
+    
+    # Aplicar filtros se o formulário for válido
+    if form.is_valid():
+        data = form.cleaned_data
+        
+        # Filtros do RemittanceHeader
+        if data.get('profissional'):
+            qs = qs.filter(profissional_nome__icontains=data['profissional'])
+        if data.get('especialidade'):
+            qs = qs.filter(especialidade__icontains=data['especialidade'])
+        if data.get('competencia'):
+            qs = qs.filter(competencia__icontains=data['competencia'])
+        if data.get('terceiro'):
+            qs = qs.filter(terceiro_nome__icontains=data['terceiro'])
+        if data.get('cnpj'):
+            qs = qs.filter(cnpj__icontains=data['cnpj'])
+        if data.get('repasse_numero'):
+            qs = qs.filter(repasse_numero__icontains=data['repasse_numero'])
+        
+        # Filtros que requerem join com RemittanceItem
+        item_filters = Q()
+        has_item_filters = False
+        
+        if data.get('convenio'):
+            item_filters &= Q(items__convenio__icontains=data['convenio'])
+            has_item_filters = True
+        if data.get('categoria'):
+            item_filters &= Q(items__categoria__icontains=data['categoria'])
+            has_item_filters = True
+        if data.get('procedimento'):
+            item_filters &= Q(items__procedimento__icontains=data['procedimento'])
+            has_item_filters = True
+        
+        if has_item_filters:
+            qs = qs.filter(item_filters).distinct()
+        
+        # Filtros de data
+        if data.get('data_inicio'):
+            qs = qs.filter(items__data__gte=data['data_inicio']).distinct()
+        if data.get('data_fim'):
+            qs = qs.filter(items__data__lte=data['data_fim']).distinct()
+        
+        # Filtros de valor
+        if data.get('valor_min'):
+            qs = qs.filter(items__valor_produzido__gte=data['valor_min']).distinct()
+        if data.get('valor_max'):
+            qs = qs.filter(items__valor_produzido__lte=data['valor_max']).distinct()
+    
+    # Paginação
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(qs, 10)
+    page_obj = paginator.get_page(page_number)
+    
+    # Processar headers da página atual para gerar resumos
+    headers = list(page_obj.object_list.prefetch_related('items'))
+    
+    if not headers:
+        context = {
+            'form': form,
+            'page_obj': page_obj,
+            'entries': [],
+            'summary_all': None,
+            'total_results': 0,
+            'applied_filters': {},
+            'has_search': True,
+        }
+        return render(request, 'reconciliation/advanced_search.html', context)
+    
+    # Gerar resumos individuais e consolidado (similar ao consolidated_dashboard)
+    entries = []
+    zero = Decimal('0.00')
+    
+    # Totais consolidados
+    total_items = 0
+    total_quantidade = zero
+    total_bruto = zero
+    total_imposto = zero
+    total_liquido = zero
+    
+    for h in headers:
+        items = list(h.items.all())
+        
+        # Resumo individual
+        qtd_items = len(items)
+        qtd_total = sum((it.quantidade or Decimal('1')) for it in items)
+        bruto_total = sum((it.valor_produzido or zero) for it in items)
+        imposto_total = sum((it.imposto or zero) for it in items)
+        liquido_total = sum((it.valor_liquido or zero) for it in items)
+        
+        # Acumular totais
+        total_items += qtd_items
+        total_quantidade += qtd_total
+        total_bruto += bruto_total
+        total_imposto += imposto_total
+        total_liquido += liquido_total
+        
+        entries.append({
+            'header': h,
+            'items': items,
+            'qtd_items': qtd_items,
+            'qtd_total': qtd_total,
+            'bruto_total': bruto_total,
+            'imposto_total': imposto_total,
+            'liquido_total': liquido_total,
+        })
+    
+    # Resumo consolidado
+    diferenca = total_bruto - total_liquido
+    taxa_media = (total_imposto / total_bruto * 100) if total_bruto > 0 else zero
+    
+    # Análise de procedimentos e convênios mais rentáveis
+    all_items = []
+    for entry in entries:
+        all_items.extend(entry['items'])
+    
+    # Procedimento mais rentável
+    procedimento_stats = {}
+    for item in all_items:
+        proc = item.procedimento or 'Não informado'
+        if proc not in procedimento_stats:
+            procedimento_stats[proc] = {'valor': zero, 'count': 0}
+        procedimento_stats[proc]['valor'] += (item.valor_produzido or zero)
+        procedimento_stats[proc]['count'] += 1
+    
+    procedimento_mais_rentavel = None
+    if procedimento_stats:
+        proc_max = max(procedimento_stats.items(), key=lambda x: x[1]['valor'])
+        procedimento_mais_rentavel = {
+            'nome': proc_max[0],
+            'valor': proc_max[1]['valor']
+        }
+    
+    # Convênio mais rentável
+    convenio_stats = {}
+    for item in all_items:
+        conv = item.convenio or 'Não informado'
+        if conv not in convenio_stats:
+            convenio_stats[conv] = {'valor': zero, 'count': 0}
+        convenio_stats[conv]['valor'] += (item.valor_produzido or zero)
+        convenio_stats[conv]['count'] += 1
+    
+    convenio_mais_rentavel = None
+    if convenio_stats:
+        conv_max = max(convenio_stats.items(), key=lambda x: x[1]['valor'])
+        convenio_mais_rentavel = {
+            'nome': conv_max[0],
+            'valor': conv_max[1]['valor']
+        }
+    
+    # Pior convênio (maior taxa de imposto sobre lucro)
+    convenio_imposto_stats = {}
+    for item in all_items:
+        conv = item.convenio or 'Não informado'
+        valor_prod = item.valor_produzido or zero
+        imposto = item.imposto or zero
+        
+        if conv not in convenio_imposto_stats:
+            convenio_imposto_stats[conv] = {'valor_total': zero, 'imposto_total': zero}
+        convenio_imposto_stats[conv]['valor_total'] += valor_prod
+        convenio_imposto_stats[conv]['imposto_total'] += imposto
+    
+    pior_convenio = None
+    if convenio_imposto_stats:
+        # Calcular taxa de imposto para cada convênio
+        convenio_taxas = []
+        for conv, stats in convenio_imposto_stats.items():
+            if stats['valor_total'] > 0:
+                taxa = (stats['imposto_total'] / stats['valor_total'] * 100)
+                convenio_taxas.append((conv, taxa))
+        
+        if convenio_taxas:
+            conv_pior = max(convenio_taxas, key=lambda x: x[1])
+            pior_convenio = {
+                'nome': conv_pior[0],
+                'taxa': conv_pior[1]
+            }
+
+    summary_all = {
+        'qtd_items': total_items,
+        'qtd_total': total_quantidade,
+        'bruto_total': total_bruto,
+        'imposto_total': total_imposto,
+        'liquido_total': total_liquido,
+        'diferenca': diferenca,
+        'taxa_media': taxa_media,
+        'procedimento_mais_rentavel': procedimento_mais_rentavel,
+        'convenio_mais_rentavel': convenio_mais_rentavel,
+        'pior_convenio': pior_convenio,
+    }
+    
+    # Filtros aplicados para exibição
+    applied_filters = {}
+    if form.is_valid():
+        for field, value in form.cleaned_data.items():
+            if value:
+                applied_filters[field] = value
+    
+    context = {
+        'form': form,
+        'page_obj': page_obj,
+        'entries': entries,
+        'summary_all': summary_all,
+        'total_results': paginator.count,
+        'applied_filters': applied_filters,
+        'header_ids': [h.id for h in headers],
+        'has_search': True,
+        # Compatibilidade com template consolidated
+        'repasse_numero': headers[0].repasse_numero if headers else '',
+        'terceiro_nome': headers[0].terceiro_nome if headers else '',
+        'competencia': headers[0].competencia if headers else '',
+        'cnpj': headers[0].cnpj if headers else '',
+        'previsao_pagamento': headers[0].previsao_pagamento if headers else '',
+    }
+    
+    return render(request, 'reconciliation/advanced_search.html', context)

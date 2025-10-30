@@ -80,3 +80,175 @@ class ProcedurePriceForm(forms.ModelForm):
             return valor_decimal
         except (InvalidOperation, ValueError):
             raise forms.ValidationError('Formato de preço inválido. Use o formato: 2.403,00 ou 2403.00')
+
+
+class AdvancedSearchForm(forms.Form):
+    """Formulário para pesquisa avançada de demonstrativos."""
+    
+    # Filtros de RemittanceHeader
+    profissional = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nome do profissional'
+        }),
+        label='Profissional'
+    )
+    
+    especialidade = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Especialidade médica'
+        }),
+        label='Especialidade'
+    )
+    
+    competencia = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex: 2024-01'
+        }),
+        label='Competência'
+    )
+    
+    terceiro = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nome do terceiro'
+        }),
+        label='Terceiro'
+    )
+    
+    cnpj = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'CNPJ (com ou sem formatação)'
+        }),
+        label='CNPJ'
+    )
+    
+    repasse_numero = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Número do repasse'
+        }),
+        label='Número do Repasse'
+    )
+    
+    # Filtros de RemittanceItem
+    convenio = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nome do convênio'
+        }),
+        label='Convênio'
+    )
+    
+    categoria = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Categoria do procedimento'
+        }),
+        label='Categoria'
+    )
+    
+    procedimento = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nome do procedimento'
+        }),
+        label='Procedimento'
+    )
+    
+    # Filtros de valor
+    valor_min = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex: 100,00'
+        }),
+        label='Valor Mínimo'
+    )
+    
+    valor_max = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex: 5000,00'
+        }),
+        label='Valor Máximo'
+    )
+    
+    # Filtros de data (preparados para uso futuro)
+    data_inicio = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        }),
+        label='Data Início'
+    )
+    
+    data_fim = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        }),
+        label='Data Fim'
+    )
+    
+    def clean_valor_min(self):
+        """Converte formato brasileiro para Decimal."""
+        value = self.cleaned_data.get('valor_min', '').strip()
+        if not value:
+            return None
+        
+        # Remove pontos e substitui vírgula por ponto
+        value = value.replace('.', '').replace(',', '.')
+        
+        try:
+            return Decimal(value)
+        except (ValueError, InvalidOperation):
+            raise forms.ValidationError("Formato inválido. Use: 100,00")
+    
+    def clean_valor_max(self):
+        """Converte formato brasileiro para Decimal."""
+        value = self.cleaned_data.get('valor_max', '').strip()
+        if not value:
+            return None
+        
+        # Remove pontos e substitui vírgula por ponto
+        value = value.replace('.', '').replace(',', '.')
+        
+        try:
+            return Decimal(value)
+        except (ValueError, InvalidOperation):
+            raise forms.ValidationError("Formato inválido. Use: 100,00")
+    
+    def clean_cnpj(self):
+        """Normaliza CNPJ removendo formatação."""
+        value = self.cleaned_data.get('cnpj', '').strip()
+        if value:
+            # Remove tudo que não é dígito
+            return ''.join(ch for ch in value if ch.isdigit())
+        return value

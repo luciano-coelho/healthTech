@@ -20,6 +20,10 @@ body {
     flex-direction: column;
     min-height: 100vh;
 }
+
+span{
+    color: black !important;
+}
     /* === Prices table layout (match screenshot style) === */
     .price-table {
         border-collapse: separate;

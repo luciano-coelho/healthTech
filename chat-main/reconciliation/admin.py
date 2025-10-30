@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PriceCatalog, ProcedurePrice
+from .models import PriceCatalog, ProcedurePrice, RemittanceHeader, RemittanceItem
 
 
 @admin.register(PriceCatalog)
@@ -15,3 +15,6 @@ class ProcedurePriceAdmin(admin.ModelAdmin):
     list_filter = ("catalog", "convenio", "ativo")
     search_fields = ("codigo", "codigo_original", "descricao", "convenio")
     ordering = ("-id",)
+
+admin.site.register(RemittanceHeader)
+admin.site.register(RemittanceItem)

@@ -5,6 +5,17 @@
 <link rel="stylesheet" href="{% static 'css/chat.css' %}">
 
 <div class="container">
+  <!-- Exibição de mensagens do Django -->
+  {% if messages %}
+  <div class="mt-3">
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}" role="alert">
+        {{ message|safe }}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="chat-box" id="chatbox">
     <div class="chat-message bot">
       <div class="bot-img"></div>

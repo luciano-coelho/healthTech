@@ -7,6 +7,7 @@ from . import views
 urlpatterns = [
     path('extrato/', extrato_redirect, name='extrato_redirect'),
     path('consolidated/', views.consolidated_dashboard, name='consolidated_dashboard'),
+    path('advanced-search/', views.advanced_search, name='advanced_search'),
     path('upload/', views.upload_remittance, name='upload_remittance'),
     path('detail/<int:id>/', views.remittance_detail, name='remittance_detail'),
     path('detail/<int:id>/reprocess/', views.reprocess_remittance, name='reprocess_remittance'),

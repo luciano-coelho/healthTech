@@ -49,6 +49,7 @@
     </div>
     <div class="menu-items">
     <a class="menu-link-primary" href="{% url 'extrato_redirect' %}">Extrato</a>
+    <a class="menu-link-primary" href="{% url 'advanced_search' %}">Pesquisa Avançada</a>
     {% if request.user.is_superuser %}
     <a class="menu-link-primary" href="{% url 'prices_list' %}">Catálogo de Preços</a>
     <a class="menu-link-primary" href="{% url 'list-users' %}">Usuários</a>
